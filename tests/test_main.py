@@ -1,4 +1,6 @@
 # tests/test_main.py
+import logging
+
 import pytest
 import main
 
@@ -43,3 +45,26 @@ def test_loop_wiring_passes_schedule(monkeypatch):
     day_lo, day_hi = 5 * 60, 5 * 60 + 5
     night_lo, night_hi = 30 * 60, 30 * 60 + 5
     assert (day_lo <= called["sec"] <= day_hi) or (night_lo <= called["sec"] <= night_hi)
+
+def test_loop_logs_monitor_error_count(monkeypatch, caplog):
+    # F4：_loop 必须把 run_monitor 的 stat（含错误数）打进日志
+    cfg = _fake_cfg()
+
+    def fake_discover(cfg_, api_, db_):
+        return 0
+
+    def fake_monitor(cfg_, api_, db_):
+        return {"danchi_checked": 3, "new_rooms": 1, "pushed": 0, "errors": ["boom"]}
+
+    def fake_sleep(sec):
+        raise RuntimeError("stop_loop")
+
+    monkeypatch.setattr("discover.run_discover", fake_discover)
+    monkeypatch.setattr("monitor.run_monitor", fake_monitor)
+    monkeypatch.setattr("main.time.sleep", fake_sleep)
+
+    with caplog.at_level(logging.INFO, logger="main"):
+        with pytest.raises(RuntimeError, match="stop_loop"):
+            main._loop(cfg, object(), object())
+    msgs = [r.message for r in caplog.records if r.name == "main"]
+    assert any("errors=1" in m for m in msgs)  # 错误数必须在日志里可见

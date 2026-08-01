@@ -30,9 +30,20 @@ def _loop(cfg, db, api):
             except Exception:
                 log.exception("discover 失败")
         try:
-            run_monitor(cfg, api, db)
+            stat = run_monitor(cfg, api, db)
         except Exception:
             log.exception("monitor 失败")
+            stat = None
+        if stat is not None:
+            n_checked = stat.get("danchi_checked", 0)
+            n_new = stat.get("new_rooms", 0)
+            n_pushed = stat.get("pushed", 0)
+            n_err = len(stat.get("errors", []))
+            if n_err:
+                log.warning("monitor 周期完成：checked=%s new=%s pushed=%s errors=%s",
+                            n_checked, n_new, n_pushed, n_err)
+            else:
+                log.info("monitor 周期完成：checked=%s new=%s pushed=%s", n_checked, n_new, n_pushed)
         interval = pick_interval(cfg.schedule, time.localtime().tm_hour) * 60
         time.sleep(interval + random.uniform(0, 5))
 
