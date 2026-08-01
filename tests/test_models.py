@@ -16,6 +16,12 @@ def test_parse_access():
     assert stations[0]["walk"] == 1  # 取最小
     assert stations[0]["station_name"] == "高尾"
 
+def test_parse_access_halfwidth_brackets():
+    # UR API 部分团地返回半角括弧 ｢｣（如 神田小川町ハイツ）
+    stations = parse_access("<li>都営新宿線｢小川町｣駅 徒歩2分</li>")
+    assert stations[0]["station_name"] == "小川町"
+    assert stations[0]["walk"] == 2
+
 def test_parse_danchi_and_room():
     d = parse_danchi({"id":"20_2600","name":"館ヶ丘","skcs":"八王子市","roomCount":10,
                       "access":"<li>JR中央線「高尾」駅 徒歩10分</li>"}, "tokyo")

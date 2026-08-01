@@ -22,7 +22,7 @@ def parse_floor(s: str) -> Tuple[int, int]:
 def parse_access(access_html: str) -> List[dict]:
     entries = []
     for li in re.findall(r"<li>(.*?)</li>", access_html or ""):
-        station = re.search(r"「([^」]+)」駅", li)
+        station = re.search(r"[「｢]([^」｣]+)[」｣]駅", li)
         walk_m = re.findall(r"徒歩(\d+)", li)
         bus_m = re.search(r"バス(\d+)分", li)
         if not station:
