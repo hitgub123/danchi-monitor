@@ -33,7 +33,7 @@ def _loop(cfg, db, api):
             run_monitor(cfg, api, db)
         except Exception:
             log.exception("monitor 失败")
-        interval = pick_interval(cfg, time.localtime().tm_hour) * 60
+        interval = pick_interval(cfg.schedule, time.localtime().tm_hour) * 60
         time.sleep(interval + random.uniform(0, 5))
 
 def main():

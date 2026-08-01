@@ -1,11 +1,45 @@
 # tests/test_main.py
+import pytest
 import main
 
+def _fake_cfg():
+    # 与真实 Config 形状一致：day_interval_min/night_interval_min 嵌套在 .schedule 下
+    return type("S", (), {"schedule": type("Sch", (), {"day_interval_min":5,"night_interval_min":30})()})()
+
 def test_pick_interval_day():
-    cfg = type("S", (), {"day_interval_min":5,"night_interval_min":30})()
-    assert main.pick_interval(cfg, 10) == 5  # 10点=日间
+    cfg = _fake_cfg()
+    assert main.pick_interval(cfg.schedule, 10) == 5  # 10点=日间
 
 def test_pick_interval_night():
-    cfg = type("S", (), {"day_interval_min":5,"night_interval_min":30})()
-    assert main.pick_interval(cfg, 23) == 30
-    assert main.pick_interval(cfg, 3) == 30
+    cfg = _fake_cfg()
+    assert main.pick_interval(cfg.schedule, 23) == 30
+    assert main.pick_interval(cfg.schedule, 3) == 30
+
+def test_loop_wiring_passes_schedule(monkeypatch):
+    """回归测试：_loop 必须把 cfg.schedule 传给 pick_interval，否则首轮后 AttributeError 崩溃"""
+    called = {}
+    cfg = _fake_cfg()
+    db = object()
+    api = object()
+
+    def fake_discover(cfg_, api_, db_):
+        return 0
+
+    def fake_monitor(cfg_, api_, db_):
+        return {}
+
+    def fake_sleep(sec):
+        called["sec"] = sec
+        raise RuntimeError("stop_loop")
+
+    monkeypatch.setattr("discover.run_discover", fake_discover)
+    monkeypatch.setattr("monitor.run_monitor", fake_monitor)
+    monkeypatch.setattr("main.time.sleep", fake_sleep)
+
+    with pytest.raises(RuntimeError, match="stop_loop"):
+        main._loop(cfg, db, api)
+    # 能走到 sleep 即证明 pick_interval(cfg.schedule, ...) 未抛 AttributeError。
+    # 间隔取决于当前小时（日间5min 或 夜间30min），加上 jitter 0~5s。
+    day_lo, day_hi = 5 * 60, 5 * 60 + 5
+    night_lo, night_hi = 30 * 60, 30 * 60 + 5
+    assert (day_lo <= called["sec"] <= day_hi) or (night_lo <= called["sec"] <= night_hi)
