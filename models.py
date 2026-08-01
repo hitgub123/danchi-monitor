@@ -8,7 +8,8 @@ def parse_rent(s: str) -> int:
     return int(m.group(1).replace(",", "")) if m else 0
 
 def parse_area(s: str) -> float:
-    m = re.search(r"([\d.]+)\s*㎡", s or "")
+    # UR API 面积单位可能是 ㎡ 或 HTML 实体 &#13217;（U+33A1）
+    m = re.search(r"([\d.]+)\s*(?:㎡|&#\d+;)", s or "")
     return float(m.group(1)) if m else 0.0
 
 def parse_floor(s: str) -> Tuple[int, int]:

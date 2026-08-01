@@ -7,6 +7,9 @@ def test_parse_rent():
 
 def test_parse_area():
     assert parse_area("53㎡") == 53.0
+    # UR API 实际返回 HTML 实体 &#13217;
+    assert parse_area("53&#13217;") == 53.0
+    assert parse_area("53㎡ / 4階") == 53.0
 
 def test_parse_floor():
     assert parse_floor("4階 /5階") == (4, 5)
