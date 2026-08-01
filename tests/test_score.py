@@ -52,6 +52,15 @@ def test_should_push_flags_new():
     assert 0 <= s <= 100
     assert reason
 
+def test_floor_zero_unknown_gets_no_score():
+    # 回归：floor<=0（解析失败/未知）不得当 1-2 楼给满分，应与 ≥6 楼同记 0 分
+    w = Weights()
+    f0 = score_room(make_room(floor=0, has_elevator=True), w)
+    f1 = score_room(make_room(floor=1, has_elevator=True), w)
+    f6 = score_room(make_room(floor=6, has_elevator=True), w)
+    assert f1 - f0 == w.floor          # floor=0 无楼层分，floor=1 有满分
+    assert f0 == f6                     # 未知楼层与 ≥6 楼同分（0 分）
+
 def test_floor_score_lower_floor_better():
     w = Weights()
     f1 = score_room(make_room(floor=1, has_elevator=True), w)
