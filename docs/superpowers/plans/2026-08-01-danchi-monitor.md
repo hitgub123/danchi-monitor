@@ -359,22 +359,30 @@ class UrApi:
             "station_cd1": station_cd1, "station_cost1": "60", "station_change1": "2",
             "station_condition": station_condition,
         }
+        # 宽筛参数：用实测正确的名称（rent_high / walk / floorspace_low）。
+        # 这些是"尽力而为"的体积缩减，服务端可能忽略；精确判定永远在本地 score.py，
+        # 因此即使宽筛无效也不会漏房，只是多抓几条。
         if wide:
-            params["rent_max"] = str(wide.rent_max)
-            params["walk_max"] = str(wide.walk_max)
-            params["area_min"] = str(wide.area_min)
+            params["rent_high"] = str(wide.rent_max)
+            params["walk"] = str(wide.walk_max)
+            params["floorspace_low"] = str(wide.area_min)
         raw = self._post("bukken/search/list_bukken/", params)
         return json.loads(raw.decode("utf-8")) if raw.strip() else []
 
     def get_room_list(self, danchi_id: str, station_condition: str, wide, prefecture: str) -> list:
         import json
+        station_cd1 = station_condition.split(",")[0] if station_condition else ""
         params = {
             "block": "kanto", "tdfk": "13", "area": "", "vacancy": "1",
             "leadtimeCount": "1",
-            "station_cd1": "", "station_cost1": "60", "station_change1": "2",
+            "station_cd1": station_cd1, "station_cost1": "60", "station_change1": "2",
             "station_condition": station_condition,
             "mode": "init", "id": danchi_id,
         }
+        if wide:
+            params["rent_high"] = str(wide.rent_max)
+            params["walk"] = str(wide.walk_max)
+            params["floorspace_low"] = str(wide.area_min)
         raw = self._post("room/list/", params)
         return json.loads(raw.decode("utf-8")) if raw.strip() else []
 
@@ -385,6 +393,17 @@ class UrApi:
         shikibetu = danchi_id[6]
         params = {"id": room_id, "shisya": shisya, "danchi": danchi, "shikibetu": shikibetu, "sp": ""}
         raw = self._post("bukken/detail/detail_room/", params)
+        data = json.loads(raw.decode("utf-8"))
+        return data[0] if data else {}
+
+    def get_danchi_detail(self, danchi_id: str) -> dict:
+        """团地级详情。电梯等设施在此层（room 详情不含电梯）。已实测。"""
+        import json
+        shisya = danchi_id[:2]
+        danchi = danchi_id[3:6]
+        shikibetu = danchi_id[6]
+        params = {"id": danchi_id, "shisya": shisya, "danchi": danchi, "shikibetu": shikibetu, "sp": ""}
+        raw = self._post("bukken/detail/detail_bukken_bukken/", params)
         data = json.loads(raw.decode("utf-8"))
         return data[0] if data else {}
 ```
@@ -651,7 +670,7 @@ def enrich_room_from_detail(room: Room, detail: dict, renovated_keywords: list) 
         room.total_floors = total
     facility = detail.get("facility") or ""
     room.facility = facility
-    room.has_elevator = "エレベーター" in facility
+    # 注意：电梯在团地级，不在房间级 —— 由 danchi.has_elevator 流入 room（parse_room），此处不改写
     room.renovated = any(k in (facility + (detail.get("feature") or "")) for k in renovated_keywords)
 ```
 
@@ -1355,6 +1374,8 @@ class FakeApi:
         return self._r.get(danchi_id, [])
     def get_room_detail(self, danchi_id, room_id):
         return self._det.get((danchi_id, room_id), {})
+    def get_danchi_detail(self, danchi_id):
+        return {"facility": "エレベーター"}  # 电梯在团地级
 
 DANCHI = [{"id":"20_2600","name":"館ヶ丘","skcs":"八王子市","roomCount":1,
            "access":"<li>JR中央線「高尾」駅 徒歩10分</li>"}]
@@ -1459,6 +1480,9 @@ def run_monitor(cfg, api, db, notify_fn=None, comment_fn=None):
             try:
                 danchi = M.parse_danchi(d, "tokyo")
                 danchi.commute_min = _resolve_commute(danchi, api, table)
+                # 电梯在团地级详情里
+                d_detail = api.get_danchi_detail(d["id"])
+                danchi.has_elevator = "エレベーター" in (d_detail.get("facility") or "")
                 rooms = api.get_room_list(d["id"], cond, cfg.wide_filter, "tokyo")
             except Exception as e:
                 stat["errors"].append(f"{d['id']}: {e}"); continue
