@@ -15,6 +15,10 @@ class FakeApi:
     def get_danchi_list(self, area, cond, wide, pref):
         self.calls.append(("list", area))
         return self._d.get(area, [])
+    def suggest_station(self, name):
+        return [{"value": "2354", "text": name}]
+    def get_danchi_detail(self, danchi_id):
+        return {"facility": "エレベーター"}
 
 SAMPLE_XML = '<?xml version="1.0" encoding="euc-jp"?><trainDoc><stationList><stationTo code="2354"><stationName>新橋</stationName><costTime>2</costTime><changeTimes>0</changeTimes></stationTo></stationList></trainDoc>'.encode("euc-jp")
 
@@ -40,3 +44,12 @@ def test_run_discover_idempotent():
     discover.run_discover(make_cfg(), api, db)
     n = discover.run_discover(make_cfg(), api, db)
     assert n == 0  # 第二次无新增
+
+def test_run_discover_populates_static():
+    # F3：discover 刷新每团地通勤分钟+电梯入 DB，monitor 每轮不再调 API
+    danchi = {"id":"20_2600","name":"館ヶ丘","skcs":"八王子市","roomCount":10,
+              "access":"<li>JR中央線「高尾」駅 徒歩10分</li>"}
+    api = FakeApi(SAMPLE_XML, {"01":[danchi]})
+    db = DB(":memory:"); db.init()
+    discover.run_discover(make_cfg(), api, db)
+    assert db.get_danchi_static("20_2600") == (2, True)  # 高尾→2354→costTime2；团地详情有电梯
