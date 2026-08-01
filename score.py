@@ -27,7 +27,8 @@ def score_room(room: Room, weights) -> float:
     rent = weights.rent * max(0.0, 1 - room.rent / 100000)
     area = weights.area * max(0.0, min(1.0, (room.area - 40) / 40))
     room_type = weights.room_type if ("LDK" in room.madori) else weights.room_type * 0.4
-    floor = weights.floor * max(0.0, 1 - max(0, room.floor - 1))
+    # 楼层：1-2楼满分，往上递减，≥6楼记0
+    floor = weights.floor if room.floor <= 2 else weights.floor * max(0.0, (6 - room.floor) / 4)
     tokyo = weights.tokyo if room.prefecture == "tokyo" else 0
     return round(commute + walk + rent + area + room_type + floor + tokyo, 1)
 

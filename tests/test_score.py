@@ -51,3 +51,20 @@ def test_should_push_flags_new():
     assert ok
     assert 0 <= s <= 100
     assert reason
+
+def test_floor_score_lower_floor_better():
+    w = Weights()
+    f1 = score_room(make_room(floor=1, has_elevator=True), w)
+    f2 = score_room(make_room(floor=2, has_elevator=True), w)
+    f3 = score_room(make_room(floor=3, has_elevator=True), w)
+    f4 = score_room(make_room(floor=4, has_elevator=True), w)
+    f5 = score_room(make_room(floor=5, has_elevator=True), w)
+    f6 = score_room(make_room(floor=6, has_elevator=True), w)
+    f10 = score_room(make_room(floor=10, has_elevator=True), w)
+    # 1-2楼满分
+    assert f1 == f2
+    # 低楼层更高分（单调非增），1楼高于4楼
+    assert f1 > f4
+    assert f2 > f3 > f4 > f5 > f6
+    # ≥6楼记0：与10楼同分
+    assert f6 == f10
