@@ -91,7 +91,7 @@ def run_monitor(cfg, api, db, notify_fn=None, comment_fn=None):
                     stat["pushed"] += 1
                     db.mark_room_seen(room.room_id, d["id"])
                     db.upsert_history(room.room_id, d["id"], score, reason, room.url)
-                    comment = comment_fn(room) if webhook else ""
+                    comment = comment_fn(room) if webhook and getattr(getattr(cfg, "discord", None), "llm_comment", True) else ""
                     if comment:
                         import notify
                         notify.notify_llm_comment(webhook, room, comment)

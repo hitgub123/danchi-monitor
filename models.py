@@ -32,7 +32,7 @@ def parse_access(access_html: str) -> List[dict]:
         for i in range(1, len(parts), 2):
             station = parts[i].strip()
             after = parts[i + 1] if i + 1 < len(parts) else ""
-            if re.search(r"バス(\d+)分", after):
+            if re.search(r"バス\d+(?:～\d+)?分", after):  # 覆盖 バス7分 / バス29～32分
                 entries.append({"station_name": station, "walk": 99, "has_bus": True})
             else:
                 walk_m = [int(x) for x in re.findall(r"徒歩(\d+)", after)]

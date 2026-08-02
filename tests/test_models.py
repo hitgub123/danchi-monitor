@@ -38,6 +38,14 @@ def test_parse_access_chooses_walk_across_lis():
     assert stations[0]["walk"] == 29
     assert stations[0]["has_bus"] is False
 
+def test_parse_access_bus_range_is_poor():
+    # 2026-08-02 回归: UR 用 "バス29～32分" 区间格式, 必须识别为巴士(距离差99), 不能当徒步1分
+    html = "<li>JR横浜線・小田急小田原線「町田」駅バス29～32分 徒歩1～3分</li>"
+    stations = parse_access(html)
+    assert stations[0]["station_name"] == "町田"
+    assert stations[0]["walk"] == 99
+    assert stations[0]["has_bus"] is True
+
 def test_parse_access_halfwidth_brackets():
     # UR API 部分团地返回半角括弧 ｢｣（如 神田小川町ハイツ）
     stations = parse_access("<li>都営新宿線｢小川町｣駅 徒歩2分</li>")

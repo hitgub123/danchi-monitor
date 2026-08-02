@@ -54,6 +54,7 @@ class Schedule:
 @dataclass
 class Discord:
     webhook_url: str
+    llm_comment: bool = True  # 是否发 LLM 点评(第二波)
 
 @dataclass
 class Http:
