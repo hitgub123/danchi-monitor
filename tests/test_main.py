@@ -13,7 +13,9 @@ class _FakeDB:
     def count_danchi(self):
         return 1  # 非空库，跳过启动时 bootstrap
     def get_meta(self, key):
-        return None  # 未记录 → 触发一次 discover
+        if key == "last_stats":
+            return "9999999999"  # 未来时间戳 → 月度统计不触发(假DB无 conn)
+        return None  # last_discover 未记录 → 触发一次 discover
     def set_meta(self, key, value):
         pass
     def prune_poll_log(self, keep_days):

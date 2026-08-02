@@ -22,7 +22,11 @@ def score_room(room: Room, weights) -> float:
         walk = weights.walk - 2.8 * (room.walk_min - 10)  # 10→20, 15→6，线性
     else:
         walk = 0.0
-    rent = weights.rent * max(0.0, 1 - room.rent / 100000)
+    if room.rent <= 0:
+        # 空租金(未定价/解析失败): 不虚高给满分, 取租金分满分的一半
+        rent = weights.rent * 0.5
+    else:
+        rent = weights.rent * max(0.0, 1 - room.rent / 100000)
     area = weights.area * max(0.0, min(1.0, (room.area - 40) / 40))
     room_type = weights.room_type if ("LDK" in room.madori) else weights.room_type * 0.4
     # 楼层：1-2楼满分，往上递减，≥6楼记0；floor<=0 视为未知，不给分

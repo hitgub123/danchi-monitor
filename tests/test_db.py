@@ -56,6 +56,17 @@ def test_poll_log_written():
     assert len(rows) == 1
     assert rows[0]["vacancy_count"] == 10
 
+def test_upsert_history_updates_latest():
+    db = make_db()
+    db.init()
+    db.upsert_history("r1", "20_2600", 42.5, "旧理由", "https://x/1")
+    first_found = db.conn.execute("SELECT found_at FROM history WHERE room_id='r1'").fetchone()[0]
+    # 同一房间再次评估 → 分数/理由/链接更新, found_at 保留首次
+    db.upsert_history("r1", "20_2600", 53.8, "新理由", "https://x/2")
+    row = db.conn.execute("SELECT score,detail,url,found_at FROM history WHERE room_id='r1'").fetchone()
+    assert (row["score"], row["detail"], row["url"]) == (53.8, "新理由", "https://x/2")
+    assert row["found_at"] == first_found  # 不重复, 只更新
+
 def test_prune_poll_log_keeps_recent():
     db = make_db()
     db.init()

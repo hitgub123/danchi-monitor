@@ -50,6 +50,16 @@ def _loop(cfg, db, api):
                 db.set_meta("last_discover", str(time.time()))
         except Exception:
             log.exception("discover 失败")
+        # 月度统计：分析 poll_log 推房间新增/减少事件，存 room_flow
+        try:
+            last_s = db.get_meta("last_stats")
+            if last_s is None or time.time() - float(last_s) > DISCOVER_INTERVAL_SEC:
+                from stats import analyze_room_flow
+                n = analyze_room_flow(db, days=30)
+                db.set_meta("last_stats", str(time.time()))
+                log.info("月度房间流统计: 新增/减少事件 %s 条", n)
+        except Exception:
+            log.exception("月度统计失败")
         try:
             stat = run_monitor(cfg, api, db)
         except Exception:

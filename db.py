@@ -28,6 +28,11 @@ CREATE TABLE IF NOT EXISTS history (
 CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY, value TEXT
 );
+CREATE TABLE IF NOT EXISTS room_flow (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    danchi_id TEXT, room_id TEXT, event TEXT, event_at TEXT, period TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_room_flow_period ON room_flow(period);
 """
 
 class DB:
@@ -136,3 +141,11 @@ class DB:
             f"DELETE FROM poll_log WHERE polled_at < datetime('now','localtime','-{int(keep_days)} days')")
         self.conn.commit()
         return cur.rowcount
+
+    def upsert_history(self, room_id: str, danchi_id: str, score: float, detail: str, url: str) -> None:
+        """记录/更新房间评分历史。同一房间再次评估时更新分数/理由/链接，保留首次 found_at。"""
+        self.conn.execute(
+            "INSERT INTO history(room_id,danchi_id,score,detail,url) VALUES(?,?,?,?,?) "
+            "ON CONFLICT(room_id) DO UPDATE SET score=excluded.score, detail=excluded.detail, url=excluded.url",
+            (room_id, danchi_id, score, detail, url))
+        self.conn.commit()

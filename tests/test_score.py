@@ -90,3 +90,13 @@ def test_floor_score_lower_floor_better():
     assert f2 > f3 > f4 > f5 > f6
     # ≥6楼记0：与10楼同分
     assert f6 == f10
+
+def test_empty_rent_gets_half_rent_score():
+    # 2026-08-02: 空租金(未定价/解析失败)不再白送满分20分, 取租金分满分一半(10)
+    w = Weights()
+    s_free = score_room(make_room(rent=0), w)     # 空租金 → 10分
+    s_cheap = score_room(make_room(rent=50000), w)  # 5万 → 20*(1-0.5)=10分
+    assert s_free == s_cheap
+    # 比"真实低价"还低的分不出现: 空租金分 = w.rent * 0.5
+    s_free2 = score_room(make_room(rent=0), w)
+    assert s_free2 - s_cheap == 0
