@@ -21,15 +21,24 @@ def parse_floor(s: str) -> Tuple[int, int]:
     return (nums[0], 0) if nums else (0, 0)
 
 def parse_access(access_html: str) -> List[dict]:
+    """解析 access HTML。按站点切段，区分纯徒步与巴士路段：
+    - 纯徒步(徒歩N, 无バス) → walk=N, has_bus=False
+    - 巴士路段(バスM分徒歩K分) → walk=99, has_bus=True（巴士=站远，距离算差）
+    结果按 (has_bus, walk) 排序，纯徒步最近者在前 → 取 [0] 即最佳距离。
+    """
     entries = []
     for li in re.findall(r"<li>(.*?)</li>", access_html or ""):
-        station = re.search(r"[「｢]([^」｣]+)[」｣]駅", li)
-        walk_m = re.findall(r"徒歩(\d+)", li)
-        bus_m = re.search(r"バス(\d+)分", li)
-        if not station:
-            continue
-        walk = min(int(x) for x in walk_m) if walk_m else (int(bus_m.group(1)) if bus_m else 99)
-        entries.append({"station_name": station.group(1), "walk": walk})
+        parts = re.split(r"[「｢]([^」｣]+)[」｣]駅", li)  # [前文, 站名1, 站1后文, 站名2, ...]
+        for i in range(1, len(parts), 2):
+            station = parts[i].strip()
+            after = parts[i + 1] if i + 1 < len(parts) else ""
+            if re.search(r"バス(\d+)分", after):
+                entries.append({"station_name": station, "walk": 99, "has_bus": True})
+            else:
+                walk_m = [int(x) for x in re.findall(r"徒歩(\d+)", after)]
+                if walk_m:
+                    entries.append({"station_name": station, "walk": min(walk_m), "has_bus": False})
+    entries.sort(key=lambda e: (e["has_bus"], e["walk"]))
     return entries
 
 @dataclass
@@ -99,5 +108,7 @@ def enrich_room_from_detail(room: Room, detail: dict, renovated_keywords: list) 
         room.total_floors = total
     facility = detail.get("facility") or ""
     room.facility = facility
-    # 注意：电梯在团地级，不在房间级 —— 由 danchi.has_elevator 流入 room（parse_room），此处不改写
+    # 电梯以房间级设施为准（团地级 facility 是空泛列表，常误报"エレベーター"）；
+    # 楼栋>5层的高层默认有电梯（低层≤5 视为无电梯）。
+    room.has_elevator = ("エレベーター" in facility) or (room.total_floors > 5)
     room.renovated = any(k in (facility + (detail.get("feature") or "")) for k in renovated_keywords)

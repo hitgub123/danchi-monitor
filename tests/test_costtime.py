@@ -1,5 +1,5 @@
 # tests/test_costtime.py
-from costtime import parse_cost_time, build_station_condition
+from costtime import parse_cost_time, build_station_condition, resolve_commute_min
 
 SAMPLE = """<?xml version="1.0" encoding="euc-jp"?>
 <trainDoc status="0"><condition><stationFrom code="2827">
@@ -25,3 +25,17 @@ def test_build_station_condition():
     cond = build_station_condition("2827", table, 60, 2)
     assert cond.startswith("2827,")
     assert "2354" in cond
+
+class _FakeSuggest:
+    def __init__(self, name_to_cd):
+        self.m = name_to_cd
+    def suggest_station(self, name):
+        return [{"value": self.m.get(name, "0000")}]
+
+def test_resolve_commute_min_rejects_not_in_table():
+    # 2026-08-02: 高尾这类 >60分 的车站不在通勤表里, 必须返回 >60 以通过不了硬条件
+    table = {"2354": (2, 0)}
+    api = _FakeSuggest({"高尾": "2444", "新橋": "2354"})
+    assert resolve_commute_min("高尾", api, table) == 61   # 不在表 → 61(拒绝)
+    assert resolve_commute_min("新橋", api, table) == 2    # 在表 → 真实时间
+    assert resolve_commute_min("", api, table) == 61       # 空站名 → 61

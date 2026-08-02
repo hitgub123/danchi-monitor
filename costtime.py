@@ -22,14 +22,15 @@ def build_station_condition(dest_cd: str, table: dict, cost_max: int, change_max
     return dest_cd + "," + ",".join(codes)
 
 def resolve_commute_min(station_name: str, api, table: dict) -> int:
-    """通过站名反查 station_cd → 通勤时间。查不到返回 60（0 分，最坏情况）。"""
+    """通过站名反查 station_cd → 通勤时间。
+    查不到(不在60分表内=实际超60分, 或分辨率失败)返回 61, 使其无法通过 ≤60 硬条件。"""
     try:
         if not station_name:
-            return 60
+            return 61
         for h in api.suggest_station(station_name):
             cd = str(h["value"])
             if cd in table:
                 return table[cd][0]
     except Exception:
         pass
-    return 60
+    return 61
