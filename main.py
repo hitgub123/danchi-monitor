@@ -31,7 +31,17 @@ def _loop(cfg, db, api):
     except Exception:
         log.exception("首次 discover 失败")
 
+    last_prune = time.time()  # 启动不立即清理，满24h后每天一次
+
     while True:
+        # poll_log 保留策略：超 keep_days 的旧快照每天清理一次
+        if time.time() - last_prune > 24 * 3600:
+            try:
+                pruned = db.prune_poll_log(cfg.schedule.poll_log_keep_days)
+                log.info("清理 poll_log 超 %s 天旧数据 %s 行", cfg.schedule.poll_log_keep_days, pruned)
+            except Exception:
+                log.exception("poll_log 清理失败")
+            last_prune = time.time()
         # 月度 discover：距上次成功满30天 或 从未成功过 → 跑一次（失败则下轮自动重试）
         try:
             last = db.get_meta("last_discover")

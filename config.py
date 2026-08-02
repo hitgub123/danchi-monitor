@@ -50,6 +50,7 @@ class Baseline:
 class Schedule:
     day_interval_min: int
     night_interval_min: int
+    poll_log_keep_days: int = 90
 
 @dataclass
 class Discord:

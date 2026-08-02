@@ -5,17 +5,19 @@ import pytest
 import main
 
 def _fake_cfg():
-    # 与真实 Config 形状一致：day_interval_min/night_interval_min 嵌套在 .schedule 下
-    return type("S", (), {"schedule": type("Sch", (), {"day_interval_min":5,"night_interval_min":30})()})()
+    # 与真实 Config 形状一致：day_interval_min/night_interval_min/poll_log_keep_days 嵌套在 .schedule 下
+    return type("S", (), {"schedule": type("Sch", (), {"day_interval_min":5,"night_interval_min":30,"poll_log_keep_days":90})()})()
 
 class _FakeDB:
-    """_loop 需要的最小 DB 接口：count_danchi / get_meta / set_meta。"""
+    """_loop 需要的最小 DB 接口：count_danchi / get_meta / set_meta / prune_poll_log。"""
     def count_danchi(self):
         return 1  # 非空库，跳过启动时 bootstrap
     def get_meta(self, key):
         return None  # 未记录 → 触发一次 discover
     def set_meta(self, key, value):
         pass
+    def prune_poll_log(self, keep_days):
+        return 0
 
 def test_pick_interval_day():
     cfg = _fake_cfg()

@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS poll_log (
     polled_at TEXT DEFAULT (datetime('now','localtime')),
     danchi_id TEXT, vacancy_count INTEGER, room_ids TEXT
 );
+CREATE INDEX IF NOT EXISTS idx_poll_log_polled_at ON poll_log(polled_at);
 CREATE TABLE IF NOT EXISTS history (
     room_id TEXT PRIMARY KEY, danchi_id TEXT, score REAL,
     detail TEXT, url TEXT, llm_comment TEXT, found_at TEXT DEFAULT (datetime('now','localtime'))
@@ -128,3 +129,10 @@ class DB:
             "SELECT * FROM poll_log WHERE danchi_id=? ORDER BY id DESC LIMIT ?",
             (danchi_id, limit))
         return [dict(r) for r in rows]
+
+    def prune_poll_log(self, keep_days: int = 90) -> int:
+        """删除超过 keep_days 天的轮询快照，返回删除行数。polled_at 为 ISO 文本，可字典序比较。"""
+        cur = self.conn.execute(
+            f"DELETE FROM poll_log WHERE polled_at < datetime('now','localtime','-{int(keep_days)} days')")
+        self.conn.commit()
+        return cur.rowcount

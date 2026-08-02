@@ -56,6 +56,19 @@ def test_poll_log_written():
     assert len(rows) == 1
     assert rows[0]["vacancy_count"] == 10
 
+def test_prune_poll_log_keeps_recent():
+    db = make_db()
+    db.init()
+    db.conn.execute("INSERT INTO poll_log(polled_at,danchi_id,vacancy_count,room_ids) "
+                    "VALUES('2026-01-01 00:00:00','20_2600',3,'[]')")  # 90天前 → 删
+    db.conn.execute("INSERT INTO poll_log(danchi_id,vacancy_count,room_ids) "
+                    "VALUES('20_2600',3,'[]')")  # now → 留
+    db.conn.commit()
+    assert db.prune_poll_log(keep_days=90) == 1
+    rows = db.conn.execute("SELECT * FROM poll_log").fetchall()
+    assert len(rows) == 1
+    assert rows[0]["polled_at"] != "2026-01-01 00:00:00"
+
 def test_target_danchi_list():
     db = make_db()
     db.init()
