@@ -1,6 +1,6 @@
 # config.py
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 import yaml
 
 @dataclass
@@ -75,6 +75,7 @@ class Config:
     schedule: Schedule
     discord: Discord
     http: Http
+    push_threshold: Optional[float] = None  # 推送阈值; None=用 baseline 算出的金町基准分
 
 def _section(cls, d):
     return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
@@ -93,4 +94,5 @@ def load_config(path: str) -> Config:
         schedule=_section(Schedule, d["schedule"]),
         discord=_section(Discord, d["discord"]),
         http=_section(Http, d["http"]),
+        push_threshold=d.get("push_threshold"),
     )

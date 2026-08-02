@@ -52,6 +52,18 @@ def test_should_push_flags_new():
     assert 0 <= s <= 100
     assert reason
 
+def test_should_push_uses_push_threshold():
+    r = make_room()  # 默认分约52，通过硬条件
+    cfg = type("Cfg", (), {"precise": Precise(), "weights": Weights(), "baseline": None,
+                           "push_threshold": 40})()
+    ok, s, _ = should_push(r, cfg)
+    assert ok and s > 40
+    cfg_high = type("Cfg", (), {"precise": Precise(), "weights": Weights(), "baseline": None,
+                                "push_threshold": 99})()
+    ok2, _, reason = should_push(r, cfg_high)
+    assert not ok2
+    assert "未超过推送阈值" in reason
+
 def test_floor_zero_unknown_gets_no_score():
     # 回归：floor<=0（解析失败/未知）不得当 1-2 楼给满分，应与 ≥6 楼同记 0 分
     w = Weights()

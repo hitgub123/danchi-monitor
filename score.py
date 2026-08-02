@@ -49,10 +49,9 @@ def should_push(room: Room, cfg) -> tuple:
     if not hard_pass(room, cfg.precise):
         return False, 0.0, "未通过硬条件"
     s = score_room(room, cfg.weights)
-    if cfg.baseline is not None:
-        thr = baseline_score(cfg)
-    else:
-        thr = 0.0
+    thr = getattr(cfg, "push_threshold", None)
+    if thr is None:
+        thr = baseline_score(cfg) if cfg.baseline is not None else 0.0
     if s > thr:
         reasons = []
         if room.walk_min <= cfg.precise.walk_ideal:
@@ -61,4 +60,4 @@ def should_push(room: Room, cfg) -> tuple:
         if room.has_elevator:
             reasons.append("有电梯")
         return True, s, "；".join(reasons)
-    return False, s, "未超过基准房分数"
+    return False, s, "未超过推送阈值"
