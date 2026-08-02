@@ -84,16 +84,16 @@ def run_monitor(cfg, api, db, notify_fn=None, comment_fn=None):
                 if not ok:
                     # 决定不推 → 标记 seen（无需重试）
                     db.mark_room_seen(room.room_id, d["id"])
-                    db.conn.execute("INSERT OR IGNORE INTO history(room_id,danchi_id,score,detail) VALUES(?,?,?,?)",
-                                    (room.room_id, d["id"], score, reason))
+                    db.conn.execute("INSERT OR IGNORE INTO history(room_id,danchi_id,score,detail,url) VALUES(?,?,?,?,?)",
+                                    (room.room_id, d["id"], score, reason, room.url))
                     db.conn.commit()
                     continue
                 # 推送成功才标记 seen；推送失败保持"新"，下次轮询重试
                 if notify_fn(webhook, room, score, reason):
                     stat["pushed"] += 1
                     db.mark_room_seen(room.room_id, d["id"])
-                    db.conn.execute("INSERT OR IGNORE INTO history(room_id,danchi_id,score,detail) VALUES(?,?,?,?)",
-                                    (room.room_id, d["id"], score, reason))
+                    db.conn.execute("INSERT OR IGNORE INTO history(room_id,danchi_id,score,detail,url) VALUES(?,?,?,?,?)",
+                                    (room.room_id, d["id"], score, reason, room.url))
                     db.conn.commit()
                     comment = comment_fn(room) if webhook else ""
                     if comment:

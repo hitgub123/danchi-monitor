@@ -10,6 +10,37 @@ def test_upsert_danchi_returns_new_flag():
     assert db.upsert_danchi_from_search(d) is True
     assert db.upsert_danchi_from_search(d) is False  # 已存在
 
+def test_upsert_danchi_stores_url():
+    db = make_db()
+    db.init()
+    # bukkenUrl 是相对路径 → 应存成完整 URL
+    d = {"id":"20_3820","name":"神田小川町ハイツ","skcs":"千代田区",
+         "bukkenUrl":"/chintai/kanto/tokyo/20_3820.html"}
+    db.upsert_danchi_from_search(d)
+    rows = db.get_all_target_danchi()
+    assert rows[0]["url"] == "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_3820.html"
+    # 无 bukkenUrl 的老响应也能兼容（存空串，不崩）
+    db.upsert_danchi_from_search({"id":"20_9999","name":"x","skcs":""})
+    assert db.get_all_target_danchi()[-1]["url"] == ""
+
+def test_migrate_adds_history_url():
+    # 老库 history 无 url 列，init 必须补列
+    import os, sqlite3, tempfile
+    fd, path = tempfile.mkstemp(suffix=".db"); os.close(fd)
+    try:
+        old = sqlite3.connect(path)
+        old.execute("CREATE TABLE history (room_id TEXT PRIMARY KEY, danchi_id TEXT, score REAL, "
+                    "detail TEXT, llm_comment TEXT, found_at TEXT DEFAULT (datetime('now','localtime')))")
+        old.execute("INSERT INTO history(room_id,danchi_id,score) VALUES('r1','20_2600',80)")
+        old.commit(); old.close()
+        db = DB(path); db.init()
+        cols = {r[1] for r in db.conn.execute("PRAGMA table_info(history)")}
+        assert "url" in cols
+        row = db.conn.execute("SELECT url FROM history WHERE room_id='r1'").fetchone()
+        assert row[0] is None  # 旧行 url 为 NULL
+    finally:
+        os.remove(path)
+
 def test_room_seen_flow():
     db = make_db()
     db.init()
