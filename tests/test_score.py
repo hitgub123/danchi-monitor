@@ -13,7 +13,7 @@ def make_room(**kw):
 
 class Precise:
     rent_max=100000; area_min=40; walk_max=15; walk_ideal=10
-    elevator_min_floor=3; year_max=30; renovated_keywords=["リフォーム"]
+    elevator_min_floor=3; renovated_keywords=["リフォーム"]
 
 class Weights:
     commute=30; walk=20; rent=20; area=15; room_type=5; floor=5; tokyo=5
@@ -25,9 +25,10 @@ def test_hard_pass_rejects_high_floor_no_elevator():
     r = make_room(floor=3, has_elevator=False)
     assert not hard_pass(r, Precise())
 
-def test_hard_pass_rejects_too_old():
+def test_hard_pass_allows_old_buildings():
+    # 2026-08-02 用户决策: 完全去掉築年数硬条件(UR団地普遍40+年)。老房只要其余条件过硬就放行
     r = make_room(year=51, renovated=False)
-    assert not hard_pass(r, Precise())
+    assert hard_pass(r, Precise())
 
 def test_hard_pass_rejects_too_expensive():
     r = make_room(rent=120000)

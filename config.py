@@ -23,7 +23,6 @@ class Precise:
     walk_max: int
     walk_ideal: int
     elevator_min_floor: int
-    year_max: int
     renovated_keywords: List[str]
 
 @dataclass

@@ -12,8 +12,6 @@ def hard_pass(room: Room, precise) -> bool:
         return False
     if room.floor >= precise.elevator_min_floor and not room.has_elevator:
         return False
-    if room.year > precise.year_max and not room.renovated:
-        return False
     return True
 
 def score_room(room: Room, weights) -> float:

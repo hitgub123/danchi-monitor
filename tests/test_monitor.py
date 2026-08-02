@@ -29,7 +29,7 @@ DETAIL = {("20_2600","001080409"): {"year":"20","floor":"4階 /5階",
             "facility":"エレベーター、リフォーム"}}
 
 def make_cfg():
-    class P: rent_max=100000; area_min=40; walk_max=15; walk_ideal=10; elevator_min_floor=3; year_max=30; renovated_keywords=["リフォーム"]
+    class P: rent_max=100000; area_min=40; walk_max=15; walk_ideal=10; elevator_min_floor=3; renovated_keywords=["リフォーム"]
     class W: commute=30; walk=20; rent=20; area=15; room_type=5; floor=5; tokyo=5
     class B: rent=95000; area=43; walk=2; commute=30; madori="1DK"; western=False; floor=5
     class Dest: station_cd="2827"; commute_max_min=60; change_max=2
