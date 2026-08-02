@@ -4,6 +4,7 @@ import sqlite3
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS target_danchi (
     danchi_id TEXT PRIMARY KEY, name TEXT, skcs TEXT,
+    url TEXT,
     prefecture TEXT, station_name TEXT, walk_min INTEGER,
     commute_min INTEGER, has_elevator INTEGER,
     first_seen TEXT DEFAULT (datetime('now','localtime')),
@@ -21,7 +22,10 @@ CREATE TABLE IF NOT EXISTS poll_log (
 );
 CREATE TABLE IF NOT EXISTS history (
     room_id TEXT PRIMARY KEY, danchi_id TEXT, score REAL,
-    detail TEXT, llm_comment TEXT, found_at TEXT DEFAULT (datetime('now','localtime'))
+    detail TEXT, url TEXT, llm_comment TEXT, found_at TEXT DEFAULT (datetime('now','localtime'))
+);
+CREATE TABLE IF NOT EXISTS meta (
+    key TEXT PRIMARY KEY, value TEXT
 );
 """
 
@@ -36,21 +40,29 @@ class DB:
         self.conn.commit()
 
     def _migrate(self):
-        """老库补列：commute_min / has_elevator（团地级静态信息，NULL=尚未刷新）。"""
+        """老库补列：target_danchi 加 commute_min/has_elevator/url，history 加 url。"""
         cols = {r[1] for r in self.conn.execute("PRAGMA table_info(target_danchi)")}
         if "commute_min" not in cols:
             self.conn.execute("ALTER TABLE target_danchi ADD COLUMN commute_min INTEGER")
         if "has_elevator" not in cols:
             self.conn.execute("ALTER TABLE target_danchi ADD COLUMN has_elevator INTEGER")
+        if "url" not in cols:
+            self.conn.execute("ALTER TABLE target_danchi ADD COLUMN url TEXT")
+        hcols = {r[1] for r in self.conn.execute("PRAGMA table_info(history)")}
+        if "url" not in hcols:
+            self.conn.execute("ALTER TABLE history ADD COLUMN url TEXT")
 
     def upsert_danchi_from_search(self, d: dict) -> bool:
         cur = self.conn.execute(
             "SELECT 1 FROM target_danchi WHERE danchi_id=?", (d["id"],))
         exists = cur.fetchone() is not None
+        url = d.get("bukkenUrl") or ""
+        if url and not url.startswith("http"):
+            url = "https://www.ur-net.go.jp" + url
         self.conn.execute(
-            "INSERT INTO target_danchi(danchi_id,name,skcs) VALUES(?,?,?) "
-            "ON CONFLICT(danchi_id) DO UPDATE SET name=excluded.name, skcs=excluded.skcs",
-            (d["id"], d.get("name"), d.get("skcs") or ""))
+            "INSERT INTO target_danchi(danchi_id,name,skcs,url) VALUES(?,?,?,?) "
+            "ON CONFLICT(danchi_id) DO UPDATE SET name=excluded.name, skcs=excluded.skcs, url=excluded.url",
+            (d["id"], d.get("name"), d.get("skcs") or "", url))
         self.conn.commit()
         return not exists
 
@@ -61,8 +73,23 @@ class DB:
 
     def get_all_target_danchi(self) -> list:
         rows = self.conn.execute(
-            "SELECT danchi_id,name,skcs,prefecture FROM target_danchi WHERE active=1")
+            "SELECT danchi_id,name,skcs,url,prefecture FROM target_danchi WHERE active=1")
         return [dict(r) for r in rows]
+
+    def count_danchi(self) -> int:
+        row = self.conn.execute("SELECT COUNT(*) FROM target_danchi").fetchone()
+        return row[0] if row else 0
+
+    def get_meta(self, key: str):
+        row = self.conn.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
+        return row["value"] if row else None
+
+    def set_meta(self, key: str, value: str) -> None:
+        self.conn.execute(
+            "INSERT INTO meta(key,value) VALUES(?,?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (key, str(value)))
+        self.conn.commit()
 
     def get_danchi_static(self, danchi_id: str):
         """团地级静态信息（通勤分钟/电梯）。未刷新（commute_min 为 NULL）或不存在 → None。"""

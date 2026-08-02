@@ -48,7 +48,6 @@ class Baseline:
 
 @dataclass
 class Schedule:
-    discover_cron: str
     day_interval_min: int
     night_interval_min: int
 

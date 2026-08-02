@@ -9,6 +9,8 @@ from db import DB
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 log = logging.getLogger("main")
 
+DISCOVER_INTERVAL_SEC = 30 * 24 * 3600  # 月度 discover：距上次成功满30天再跑（开机不主动跑）
+
 def pick_interval(cfg, hour: int) -> int:
     if 8 <= hour < 22:
         return cfg.day_interval_min
@@ -20,15 +22,24 @@ def _api(cfg):
 def _loop(cfg, db, api):
     from monitor import run_monitor
     from discover import run_discover
-    last_discover = 0.0
+
+    # 全新库(无目标团地)才在启动时建一次清单；老库跳过，交给月度 discover
+    try:
+        if db.count_danchi() == 0:
+            run_discover(cfg, api, db)
+            db.set_meta("last_discover", str(time.time()))
+    except Exception:
+        log.exception("首次 discover 失败")
+
     while True:
-        now = time.time()
-        if now - last_discover > 24 * 3600:  # 至少每24h跑一次 discover
-            try:
+        # 月度 discover：距上次成功满30天 或 从未成功过 → 跑一次（失败则下轮自动重试）
+        try:
+            last = db.get_meta("last_discover")
+            if last is None or time.time() - float(last) > DISCOVER_INTERVAL_SEC:
                 run_discover(cfg, api, db)
-                last_discover = now
-            except Exception:
-                log.exception("discover 失败")
+                db.set_meta("last_discover", str(time.time()))
+        except Exception:
+            log.exception("discover 失败")
         try:
             stat = run_monitor(cfg, api, db)
         except Exception:

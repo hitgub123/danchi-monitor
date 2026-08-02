@@ -8,6 +8,15 @@ def _fake_cfg():
     # 与真实 Config 形状一致：day_interval_min/night_interval_min 嵌套在 .schedule 下
     return type("S", (), {"schedule": type("Sch", (), {"day_interval_min":5,"night_interval_min":30})()})()
 
+class _FakeDB:
+    """_loop 需要的最小 DB 接口：count_danchi / get_meta / set_meta。"""
+    def count_danchi(self):
+        return 1  # 非空库，跳过启动时 bootstrap
+    def get_meta(self, key):
+        return None  # 未记录 → 触发一次 discover
+    def set_meta(self, key, value):
+        pass
+
 def test_pick_interval_day():
     cfg = _fake_cfg()
     assert main.pick_interval(cfg.schedule, 10) == 5  # 10点=日间
@@ -21,7 +30,7 @@ def test_loop_wiring_passes_schedule(monkeypatch):
     """回归测试：_loop 必须把 cfg.schedule 传给 pick_interval，否则首轮后 AttributeError 崩溃"""
     called = {}
     cfg = _fake_cfg()
-    db = object()
+    db = _FakeDB()
     api = object()
 
     def fake_discover(cfg_, api_, db_):
@@ -65,6 +74,6 @@ def test_loop_logs_monitor_error_count(monkeypatch, caplog):
 
     with caplog.at_level(logging.INFO, logger="main"):
         with pytest.raises(RuntimeError, match="stop_loop"):
-            main._loop(cfg, object(), object())
+            main._loop(cfg, _FakeDB(), object())
     msgs = [r.message for r in caplog.records if r.name == "main"]
     assert any("errors=1" in m for m in msgs)  # 错误数必须在日志里可见
