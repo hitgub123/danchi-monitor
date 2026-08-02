@@ -76,11 +76,15 @@ def parse_danchi(d: dict, prefecture: str) -> Danchi:
         station_name=station_name, walk_min=walk_min,
     )
 
+def _full_url(u: str) -> str:
+    """UR API 返回的 urlDetail 是相对路径, 补全为完整链接。"""
+    return u if (not u or u.startswith("http")) else "https://www.ur-net.go.jp" + u
+
 def parse_room(r: dict, danchi: Danchi) -> Room:
     floor, total = parse_floor(r.get("floor"))
     return Room(
         room_id=r["id"], danchi_id=danchi.danchi_id, danchi_name=danchi.name,
-        name=r.get("name") or "", url=r.get("urlDetail") or "",
+        name=r.get("name") or "", url=_full_url(r.get("urlDetail") or ""),
         rent=parse_rent(r.get("rent")), commonfee=parse_rent(r.get("commonfee")),
         madori=r.get("type") or "", area=parse_area(r.get("floorspace")),
         floor=floor, total_floors=total, has_elevator=danchi.has_elevator,

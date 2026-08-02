@@ -32,3 +32,16 @@ def test_notify_new_room(monkeypatch):
 def test_notify_returns_false_on_error(monkeypatch):
     cap = make_poster(monkeypatch, 500, "boom")
     assert notify.send_discord("https://discord.test/hook", "t", [], 0) is False
+
+def test_send_discord_normalizes_relative_url(monkeypatch):
+    # 回归：Discord embed 的 url 必须完整; UR 返回的相对路径 /chintai/... 必须补全为 https://www.ur-net.go.jp/...
+    cap = make_poster(monkeypatch, 204)
+    ok = notify.send_discord("https://discord.test/hook", "t", [], 0,
+                             "/chintai/kanto/tokyo/20_2600_room.html?JKSS=001080409")
+    assert ok is True
+    assert cap["json"]["embeds"][0]["url"] == \
+        "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_2600_room.html?JKSS=001080409"
+    # 已是完整 URL 则原样保留
+    cap2 = make_poster(monkeypatch, 204)
+    notify.send_discord("https://discord.test/hook", "t", [], 0, "https://x.example/y")
+    assert cap2["json"]["embeds"][0]["url"] == "https://x.example/y"

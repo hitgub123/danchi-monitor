@@ -6,7 +6,8 @@ def send_discord(webhook_url: str, title: str, fields: list, color: int, url: st
         return False
     embed = {"title": title, "color": color, "fields": fields}
     if url:
-        embed["url"] = url
+        # Discord embed 的 url 必须是完整 http 链接; UR API 给的是相对路径, 这里兜底补全
+        embed["url"] = url if url.startswith("http") else "https://www.ur-net.go.jp" + url
     try:
         r = requests.post(webhook_url, json={"embeds": [embed]}, timeout=10)
         return r.status_code in (200, 204)
