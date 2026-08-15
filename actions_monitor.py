@@ -150,17 +150,28 @@ def _commit_snapshot(path, room_count):
     if not os.environ.get("GITHUB_TOKEN"):
         return False
     branch = os.environ.get("GITHUB_REF_NAME") or "main"   # Actions 是 detached HEAD, 先回分支再 push
-    subprocess.run(["git", "config", "user.email", "github-actions[bot]@users.noreply.github.com"])
-    subprocess.run(["git", "config", "user.name", "github-actions[bot]"])
-    subprocess.run(["git", "checkout", "-B", branch])
-    subprocess.run(["git", "add", path])
+    for cmd in (
+        ["git", "config", "user.email", "github-actions[bot]@users.noreply.github.com"],
+        ["git", "config", "user.name", "github-actions[bot]"],
+        ["git", "checkout", "-B", branch],
+        ["git", "add", path],
+    ):
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode != 0:
+            print(f"[commit] FAIL {' '.join(cmd[:2])}: {r.stderr.strip()}", file=sys.stderr)
+            return False
     r = subprocess.run(["git", "commit", "-m", f"snapshot: {room_count} rooms"],
                        capture_output=True, text=True)
     if r.returncode != 0:
+        print(f"[commit] FAIL commit: {r.stderr.strip()}", file=sys.stderr)
         return False
-    subprocess.run(["git", "pull", "--rebase", "origin", branch], capture_output=True)
+    r = subprocess.run(["git", "pull", "--rebase", "origin", branch], capture_output=True, text=True)
+    if r.returncode != 0:
+        print(f"[commit] FAIL pull --rebase: {r.stderr.strip()}", file=sys.stderr)
+        return False
     p = subprocess.run(["git", "push", "origin", branch], capture_output=True, text=True)
     if p.returncode != 0:
+        print(f"[commit] FAIL push: {p.stderr.strip()}", file=sys.stderr)
         return False
     return True
 
@@ -175,8 +186,9 @@ def main():
     stat = run(cfg, api)
     print(f"total={stat['total']} new={stat['new']} pushed={stat['pushed']} changed={stat['changed']}",
           flush=True)
-    if stat["changed"]:
-        _commit_snapshot(SNAPSHOT_PATH, stat["total"])
+    if stat["changed"] and not _commit_snapshot(SNAPSHOT_PATH, stat["total"]):
+        print("ERROR: 快照 commit/push 失败(见上方 [commit] 输出)", file=sys.stderr)
+        return 3
     return 0
 
 
