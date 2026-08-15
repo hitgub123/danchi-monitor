@@ -1,0 +1,29 @@
+name: danchi-monitor
+
+on:
+  schedule:
+    - cron: '25,30,35,40,45 1,3,5,7,9 * * *'   # UTC=JST 10:25-18:45 偶数小时密集(5分)
+    - cron: '*/30 * * * *'                      # 全天 30 分钟兜底
+  workflow_dispatch:                            # 手动触发(任意分支可测)
+
+permissions:
+  contents: write
+
+concurrency:
+  group: danchi-monitor
+  cancel-in-progress: true
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install requests pyyaml
+      - name: 监控上新
+        env:
+          DANCHI_DISCORD_WEBHOOK: ${{ secrets.DANCHI_DISCORD_WEBHOOK }}
+        run: python actions_monitor.py

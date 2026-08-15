@@ -12,9 +12,9 @@ pip install -r requirements.txt
 2. 调整 `precise`（精确条件）、`weights`（打分权重）、`schedule`（轮询节奏）
 
 ## 运行
-- 手动单次监控：`python run_monitor_once.py`
-- 常驻运行：`python main.py`（每月 discover + 日间10分/密集窗口3分/夜间60分轮询）
-- 日志：控制台 + 可重定向到文件
+- **线上（推荐）**：GitHub Actions（`.github/workflows/monitor.yml`）定时抓取 + 快照 diff 上新通知 Discord。仓库 PUBLIC → webhook 走 secret `DANCHI_DISCORD_WEBHOOK`；配置在 `config.actions.yaml`（无 webhook）；快照在 `snapshot/rooms.json`。
+- 手动本地单次：`python run_monitor_once.py`（需本地 `config.yaml`）
+- 旧常驻模式 `python main.py` 已停用（本地不再自启轮询）
 
 ## 数据
 - `data.db`：目标团地 / 已见房间 / poll_log（轮询快照，可做时间序列分析）/ history
