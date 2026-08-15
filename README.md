@@ -13,7 +13,7 @@ pip install -r requirements.txt
 
 ## 运行
 - 手动单次监控：`python run_monitor_once.py`
-- 常驻运行：`python main.py`（每月 discover + 日间5分/夜间30分轮询）
+- 常驻运行：`python main.py`（每月 discover + 日间10分/密集窗口3分/夜间60分轮询）
 - 日志：控制台 + 可重定向到文件
 
 ## 数据
