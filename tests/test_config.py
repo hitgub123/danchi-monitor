@@ -25,3 +25,11 @@ def test_schedule_config_parsed():
     assert cfg.schedule.dense_windows.start_min == 27
     assert cfg.schedule.dense_windows.end_min == 42
     assert cfg.schedule.dense_windows.interval_min == 3
+
+def test_dense_windows_section_filters_unknown_keys():
+    from config import _section, DenseWindows
+    dw = _section(DenseWindows, {"hours": [10], "start_min": 27, "end_min": 42, "interval_min": 3, "stray": 1})
+    assert dw.hours == [10]
+    assert dw.start_min == 27
+    assert dw.interval_min == 3
+    assert not hasattr(dw, "stray")

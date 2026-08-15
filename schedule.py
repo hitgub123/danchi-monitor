@@ -22,11 +22,22 @@ class PollSchedule:
 
     def __init__(self, day_interval_min, night_interval_min,
                  day_start_hour=8, day_end_hour=22, dense=None):
+        # 间隔须为正整数：0 会让 _is_grid 的 % 抛 ZeroDivisionError，
+        # 且发生在 main.py 的 sleep 调用（try 外），静默杀掉无人值守守护进程。fail fast。
+        self._require_positive("day_interval_min", day_interval_min)
+        self._require_positive("night_interval_min", night_interval_min)
+        if dense is not None:
+            self._require_positive("dense.interval_min", dense.interval_min)
         self.day_interval_min = day_interval_min
         self.night_interval_min = night_interval_min
         self.day_start_hour = day_start_hour
         self.day_end_hour = day_end_hour
         self.dense = dense
+
+    @staticmethod
+    def _require_positive(name, value):
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            raise ValueError(f"interval must be positive: {name}={value}")
 
     def _is_grid(self, t: datetime) -> bool:
         d = self.dense

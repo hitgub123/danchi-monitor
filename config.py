@@ -98,7 +98,7 @@ def load_config(path: str) -> Config:
     schedule_data = dict(d.get("schedule") or {})
     dw = schedule_data.get("dense_windows")
     if dw:
-        schedule_data["dense_windows"] = DenseWindows(**dw)
+        schedule_data["dense_windows"] = _section(DenseWindows, dw)
     return Config(
         destination=_section(Destination, d["destination"]),
         prefectures=d["prefectures"],

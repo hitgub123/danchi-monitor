@@ -48,3 +48,12 @@ def test_no_dense_degradation():
     s = make_sched(dense=None)
     assert s.next_poll_at(dt(12, 27)) == dt(12, 30)
     assert s.next_poll_at(dt(12, 30)) == dt(12, 40)
+
+def test_rejects_zero_intervals():
+    with pytest.raises(ValueError):
+        PollSchedule(day_interval_min=0, night_interval_min=60)
+    with pytest.raises(ValueError):
+        PollSchedule(day_interval_min=10, night_interval_min=0)
+    with pytest.raises(ValueError):
+        PollSchedule(day_interval_min=10, night_interval_min=60,
+                     dense=DenseWindows(hours=[10], start_min=27, end_min=42, interval_min=0))
