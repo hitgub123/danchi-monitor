@@ -1,0 +1,55 @@
+destination:
+  station_name: "浜松町"
+  station_cd: "2827"
+  commute_max_min: 60
+  change_max: 2
+
+prefectures: ["tokyo"]
+areas: ["01", "02", "03", "04", "05", "06"]
+
+wide_filter:
+  rent_max: 110000
+  walk_max: 15
+  area_min: 35
+
+precise:
+  rent_max: 100000
+  area_min: 40
+  walk_max: 15
+  walk_ideal: 10
+  elevator_min_floor: 3
+  renovated_keywords: ["リフォーム", "リノベーション", "リフォーム済み"]
+
+weights:
+  commute: 30
+  walk: 20
+  rent: 20
+  area: 15
+  room_type: 5
+  floor: 5
+  tokyo: 5
+
+baseline:
+  rent: 95000
+  area: 43
+  walk: 2
+  commute: 30
+  madori: "1DK"
+  western: false
+  floor: 5
+
+push_threshold: 40
+
+schedule:
+  day_interval_min: 10
+  night_interval_min: 60
+
+discord:
+  webhook_url: ""          # webhook 走 Actions secret(DANCHI_DISCORD_WEBHOOK); 仓库 PUBLIC, 绝不写真值
+  llm_comment: false
+
+http:
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
+  timeout: 30
+  retry_max: 3
+  backoff_base_sec: 2
