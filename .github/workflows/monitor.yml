@@ -26,4 +26,5 @@ jobs:
       - name: 监控上新
         env:
           DANCHI_DISCORD_WEBHOOK: ${{ secrets.DANCHI_DISCORD_WEBHOOK }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python actions_monitor.py
