@@ -2,22 +2,34 @@
 import logging
 import time
 import random
+from datetime import datetime
 from config import load_config
 from ur_api import UrApi
 from db import DB
+from schedule import PollSchedule
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
 log = logging.getLogger("main")
 
 DISCOVER_INTERVAL_SEC = 30 * 24 * 3600  # 月度 discover：距上次成功满30天再跑（开机不主动跑）
 
-def pick_interval(cfg, hour: int) -> int:
-    if 8 <= hour < 22:
-        return cfg.day_interval_min
-    return cfg.night_interval_min
-
 def _api(cfg):
     return UrApi(cfg.http.user_agent, cfg.http.timeout, cfg.http.retry_max, cfg.http.backoff_base_sec)
+
+def build_schedule(s):
+    return PollSchedule(
+        day_interval_min=s.day_interval_min,
+        night_interval_min=s.night_interval_min,
+        day_start_hour=s.day_start_hour,
+        day_end_hour=s.day_end_hour,
+        dense=s.dense_windows,
+    )
+
+def _next_sleep_sec(sched, now, max_jitter_sec):
+    """睡到 sched 的下一网格时刻 + 反封抖动。抖动不累积漂移（下轮从真实墙钟重算）。"""
+    target = sched.next_poll_at(now)
+    sec = max(0.0, (target - now).total_seconds())
+    return sec + random.uniform(0, max_jitter_sec)
 
 def _loop(cfg, db, api):
     from monitor import run_monitor
@@ -32,6 +44,8 @@ def _loop(cfg, db, api):
         log.exception("首次 discover 失败")
 
     last_prune = time.time()  # 启动不立即清理，满24h后每天一次
+
+    sched = build_schedule(cfg.schedule)
 
     while True:
         # poll_log 保留策略：超 keep_days 的旧快照每天清理一次
@@ -75,8 +89,7 @@ def _loop(cfg, db, api):
                             n_checked, n_new, n_pushed, n_err)
             else:
                 log.info("monitor 周期完成：checked=%s new=%s pushed=%s", n_checked, n_new, n_pushed)
-        interval = pick_interval(cfg.schedule, time.localtime().tm_hour) * 60
-        time.sleep(interval + random.uniform(0, 5))
+        time.sleep(_next_sleep_sec(sched, datetime.now(), cfg.schedule.max_jitter_sec))
 
 def main():
     cfg = load_config("config.yaml")

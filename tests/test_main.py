@@ -3,10 +3,21 @@ import logging
 
 import pytest
 import main
+from datetime import datetime
+
 
 def _fake_cfg():
-    # 与真实 Config 形状一致：day_interval_min/night_interval_min/poll_log_keep_days 嵌套在 .schedule 下
-    return type("S", (), {"schedule": type("Sch", (), {"day_interval_min":5,"night_interval_min":30,"poll_log_keep_days":90})()})()
+    # 与真实 Config 形状一致，schedule 含新字段
+    class S:
+        day_interval_min = 10
+        night_interval_min = 60
+        day_start_hour = 8
+        day_end_hour = 22
+        dense_windows = None
+        poll_log_keep_days = 90
+        max_jitter_sec = 5
+    return type("C", (), {"schedule": S()})()
+
 
 class _FakeDB:
     """_loop 需要的最小 DB 接口：count_danchi / get_meta / set_meta / prune_poll_log。"""
@@ -21,17 +32,19 @@ class _FakeDB:
     def prune_poll_log(self, keep_days):
         return 0
 
-def test_pick_interval_day():
-    cfg = _fake_cfg()
-    assert main.pick_interval(cfg.schedule, 10) == 5  # 10点=日间
 
-def test_pick_interval_night():
-    cfg = _fake_cfg()
-    assert main.pick_interval(cfg.schedule, 23) == 30
-    assert main.pick_interval(cfg.schedule, 3) == 30
+def test_next_sleep_sec_returns_seconds_until_target(monkeypatch):
+    class FakeSched:
+        def next_poll_at(self, now):
+            return datetime(2026, 8, 15, 12, 30)
+    monkeypatch.setattr("random.uniform", lambda a, b: 2.5)
+    now = datetime(2026, 8, 15, 12, 20)
+    # 12:30 - 12:20 = 600s + jitter 2.5
+    assert main._next_sleep_sec(FakeSched(), now, 5) == 600 + 2.5
 
-def test_loop_wiring_passes_schedule(monkeypatch):
-    """回归测试：_loop 必须把 cfg.schedule 传给 pick_interval，否则首轮后 AttributeError 崩溃"""
+
+def test_loop_wiring_builds_schedule_and_sleeps(monkeypatch):
+    """回归测试：_loop 必须用 cfg.schedule 构造调度器并睡到下一网格点，否则首轮后崩溃"""
     called = {}
     cfg = _fake_cfg()
     db = _FakeDB()
@@ -50,17 +63,14 @@ def test_loop_wiring_passes_schedule(monkeypatch):
     monkeypatch.setattr("discover.run_discover", fake_discover)
     monkeypatch.setattr("monitor.run_monitor", fake_monitor)
     monkeypatch.setattr("main.time.sleep", fake_sleep)
+    monkeypatch.setattr("main._next_sleep_sec", lambda sched, now, jitter: 42)
 
     with pytest.raises(RuntimeError, match="stop_loop"):
         main._loop(cfg, db, api)
-    # 能走到 sleep 即证明 pick_interval(cfg.schedule, ...) 未抛 AttributeError。
-    # 间隔取决于当前小时（日间5min 或 夜间30min），加上 jitter 0~5s。
-    day_lo, day_hi = 5 * 60, 5 * 60 + 5
-    night_lo, night_hi = 30 * 60, 30 * 60 + 5
-    assert (day_lo <= called["sec"] <= day_hi) or (night_lo <= called["sec"] <= night_hi)
+    assert called["sec"] == 42  # 走到了 sleep，且用的是调度器算出的秒数
+
 
 def test_loop_logs_monitor_error_count(monkeypatch, caplog):
-    # F4：_loop 必须把 run_monitor 的 stat（含错误数）打进日志
     cfg = _fake_cfg()
 
     def fake_discover(cfg_, api_, db_):
@@ -75,9 +85,10 @@ def test_loop_logs_monitor_error_count(monkeypatch, caplog):
     monkeypatch.setattr("discover.run_discover", fake_discover)
     monkeypatch.setattr("monitor.run_monitor", fake_monitor)
     monkeypatch.setattr("main.time.sleep", fake_sleep)
+    monkeypatch.setattr("main._next_sleep_sec", lambda sched, now, jitter: 42)
 
     with caplog.at_level(logging.INFO, logger="main"):
         with pytest.raises(RuntimeError, match="stop_loop"):
             main._loop(cfg, _FakeDB(), object())
     msgs = [r.message for r in caplog.records if r.name == "main"]
-    assert any("errors=1" in m for m in msgs)  # 错误数必须在日志里可见
+    assert any("errors=1" in m for m in msgs)
