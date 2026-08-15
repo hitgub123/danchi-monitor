@@ -1,7 +1,9 @@
 # config.py
+import os
 from dataclasses import dataclass, field
 from typing import List, Optional
 import yaml
+from schedule import DenseWindows
 
 @dataclass
 class Destination:
@@ -49,7 +51,11 @@ class Baseline:
 class Schedule:
     day_interval_min: int
     night_interval_min: int
+    day_start_hour: int = 8
+    day_end_hour: int = 22
+    dense_windows: Optional[DenseWindows] = None
     poll_log_keep_days: int = 90
+    max_jitter_sec: int = 5
 
 @dataclass
 class Discord:
@@ -83,6 +89,16 @@ def _section(cls, d):
 def load_config(path: str) -> Config:
     with open(path, encoding="utf-8") as f:
         d = yaml.safe_load(f)
+    # webhook 优先取环境变量（云端部署不必把 key 写进 config.yaml）；
+    # 未设置时回退到 config.yaml 的值（本地沿用原有行为）。
+    discord_data = dict(d.get("discord") or {})
+    webhook_env = os.getenv("DANCHI_DISCORD_WEBHOOK", "").strip()
+    if webhook_env:
+        discord_data["webhook_url"] = webhook_env
+    schedule_data = dict(d.get("schedule") or {})
+    dw = schedule_data.get("dense_windows")
+    if dw:
+        schedule_data["dense_windows"] = DenseWindows(**dw)
     return Config(
         destination=_section(Destination, d["destination"]),
         prefectures=d["prefectures"],
@@ -91,8 +107,8 @@ def load_config(path: str) -> Config:
         precise=_section(Precise, d["precise"]),
         weights=_section(Weights, d["weights"]),
         baseline=_section(Baseline, d["baseline"]),
-        schedule=_section(Schedule, d["schedule"]),
-        discord=_section(Discord, d["discord"]),
+        schedule=_section(Schedule, schedule_data),
+        discord=_section(Discord, discord_data),
         http=_section(Http, d["http"]),
         push_threshold=d.get("push_threshold"),
     )
