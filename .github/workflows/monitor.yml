@@ -3,7 +3,7 @@ name: danchi-monitor
 on:
   schedule:
     - cron: '25,30,35,40,45 1,3,5,7,9 * * *'   # UTC=JST 10:25-18:45 偶数小时密集(5分)
-    - cron: '7 * * * *'                          # 全天每小时兜底(避开整点高峰)
+    - cron: '7 0,2,4,6,8,10,11,23 * * *'        # UTC=JST 8:07-20:07 每小时兜底(避开密集偶数小时, 夜间不跑)
   workflow_dispatch:                            # 手动触发(任意分支可测)
 
 permissions:
