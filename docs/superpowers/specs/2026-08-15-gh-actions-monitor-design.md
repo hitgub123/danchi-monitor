@@ -125,7 +125,7 @@ jobs:
 **快照格式**（最新版覆盖，唯一持久状态）：
 ```json
 {
-  "cond": "2827,60,2",
+  "table": { "2354": [2, 0] },
   "danchi_static": { "20_2600": { "commute_min": 30, "has_elevator": true, "walk_min": 10 } },
   "rooms": { "001080409": { "danchi_id": "20_2600", "name": "72号棟409号室", "url": "/chintai/..." } }
 }

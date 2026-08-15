@@ -1,6 +1,7 @@
 import actions_monitor as am
 from config import load_config
 
+
 def test_load_snapshot_missing_returns_none(tmp_path):
     assert am.load_snapshot(str(tmp_path / "nope.json")) is None
 
@@ -30,9 +31,6 @@ def test_diff_new_finds_new_only():
 
 def test_build_cond():
     assert am.build_cond("2827", {"2354": (2, 0), "1000": (30, 1)}, 60, 2) == "2827,1000,2354"
-
-
-from config import load_config
 
 XML = ('<?xml version="1.0" encoding="euc-jp"?><trainDoc><stationList>'
        '<stationTo code="2354"><costTime>2</costTime><changeTimes>0</changeTimes></stationTo>'
@@ -111,3 +109,26 @@ def test_detail_failure_skips_snapshot_and_retries(tmp_path):
                                                                              "facility": "エレベーター、リフォーム"}}), p,
                    notify_fn=lambda *a, **k: True)
     assert stat2["new"] == 1 and stat2["pushed"] == 1
+
+def test_notify_failure_retries_next_run(tmp_path):
+    p = str(tmp_path / "rooms.json")
+    am.run(make_cfg(), FakeApi({"01": DANCHI}, {"20_2600": ROOMS}, DETAIL), p,
+           notify_fn=lambda *a, **k: True)   # 基线
+    rooms2 = ROOMS + [{"id": "0020304", "rent": "70,000円", "type": "2DK", "floorspace": "45㎡",
+                       "floor": "2階", "urlDetail": "/chintai/kanto/tokyo/20_2600_room.html?JKSS=0020304"}]
+    detail2 = {**DETAIL, ("20_2600", "0020304"): {"year": "15", "floor": "2階 /5階",
+                                                  "facility": "エレベーター、リフォーム"}}
+    api2 = FakeApi({"01": DANCHI}, {"20_2600": rooms2}, detail2)
+    # 第一次 notify 失败 → 房间不进快照
+    stat1 = am.run(make_cfg(), api2, p, notify_fn=lambda *a, **k: False)
+    assert stat1["new"] == 1 and stat1["pushed"] == 0
+    assert "0020304" not in am.load_snapshot(p)["rooms"]
+    # 第二次 notify 成功 → 房间被再次发现并推送
+    stat2 = am.run(make_cfg(), api2, p, notify_fn=lambda *a, **k: True)
+    assert stat2["new"] == 1 and stat2["pushed"] == 1
+
+def test_load_snapshot_non_dict_returns_none(tmp_path):
+    p = str(tmp_path / "rooms.json")
+    with open(p, "w", encoding="utf-8") as f:
+        f.write("[]")
+    assert am.load_snapshot(p) is None

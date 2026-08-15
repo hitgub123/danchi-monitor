@@ -21,18 +21,22 @@ def load_snapshot(path):
     try:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
-        data.setdefault("table", {})
-        data.setdefault("danchi_static", {})
-        data.setdefault("rooms", {})
-        return data
     except (FileNotFoundError, json.JSONDecodeError):
         return None
+    if not isinstance(data, dict):
+        return None
+    data.setdefault("table", {})
+    data.setdefault("danchi_static", {})
+    data.setdefault("rooms", {})
+    return data
 
 
 def save_snapshot(path, snapshot):
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(snapshot, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
 
 
 # ---- diff / 基线 ----
@@ -72,7 +76,10 @@ def current_rooms(api, cfg, cond, table, danchi_static):
             danchi = M.parse_danchi(d, "tokyo")
             if did not in danchi_static:
                 commute = costtime.resolve_commute_min(danchi.station_name, api, table)
-                elevator = "エレベーター" in (api.get_danchi_detail(did).get("facility") or "")
+                try:
+                    elevator = "エレベーター" in (api.get_danchi_detail(did).get("facility") or "")
+                except Exception:
+                    continue
                 danchi_static[did] = {"commute_min": commute, "has_elevator": elevator,
                                       "walk_min": danchi.walk_min, "name": d.get("name") or "",
                                       "skcs": d.get("skcs") or ""}
@@ -127,6 +134,8 @@ def run(cfg, api, snapshot_path=SNAPSHOT_PATH, notify_fn=None):
             continue
         if notify_fn(webhook, room, score, reason):
             pushed += 1
+        else:
+            failed.add(rid)   # 通知失败 → 不进快照 → 下次运行重试(at-least-once)
     snapshot["danchi_static"] = danchi_static
     snapshot["rooms"] = {rid: info for rid, info in rooms.items() if rid not in failed}
     old = load_snapshot(snapshot_path)
@@ -149,12 +158,19 @@ def _commit_snapshot(path, room_count):
                        capture_output=True, text=True)
     if r.returncode != 0:
         return False
-    subprocess.run(["git", "push", "origin", branch])
+    subprocess.run(["git", "pull", "--rebase", "origin", branch], capture_output=True)
+    p = subprocess.run(["git", "push", "origin", branch], capture_output=True, text=True)
+    if p.returncode != 0:
+        return False
     return True
 
 
 def main():
     cfg = load_config("config.actions.yaml")
+    webhook = getattr(getattr(cfg, "discord", None), "webhook_url", "")
+    if os.environ.get("GITHUB_TOKEN") and not webhook:
+        print("ERROR: DANCHI_DISCORD_WEBHOOK secret 未设置, 通知无法发出", file=sys.stderr)
+        return 2
     api = UrApi(cfg.http.user_agent, cfg.http.timeout, cfg.http.retry_max, cfg.http.backoff_base_sec)
     stat = run(cfg, api)
     print(f"total={stat['total']} new={stat['new']} pushed={stat['pushed']} changed={stat['changed']}",

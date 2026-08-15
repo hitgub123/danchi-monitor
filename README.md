@@ -8,8 +8,8 @@ pip install -r requirements.txt
 ```
 
 ## 配置
-1. `config.yaml` → `discord.webhook_url` 填入你的 Discord webhook URL
-2. 调整 `precise`（精确条件）、`weights`（打分权重）、`schedule`（轮询节奏）
+- **线上（Actions）**：评分参数在 `config.actions.yaml`（公共安全，webhook 留空）；webhook 存 GitHub secret `DANCHI_DISCORD_WEBHOOK`
+- **本地手动**：`config.yaml` → `discord.webhook_url` 填入 webhook；调 `precise`/`weights` 打分
 
 ## 运行
 - **线上（推荐）**：GitHub Actions（`.github/workflows/monitor.yml`）定时抓取 + 快照 diff 上新通知 Discord。仓库 PUBLIC → webhook 走 secret `DANCHI_DISCORD_WEBHOOK`；配置在 `config.actions.yaml`（无 webhook）；快照在 `snapshot/rooms.json`。

@@ -11,7 +11,7 @@ permissions:
 
 concurrency:
   group: danchi-monitor
-  cancel-in-progress: true
+  cancel-in-progress: false   # 串行化: 消除 kill 窗口与非快进 push
 
 jobs:
   monitor:
