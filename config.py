@@ -82,6 +82,7 @@ class Config:
     discord: Discord
     http: Http
     push_threshold: Optional[float] = None  # 推送阈值; None=用 baseline 算出的金町基准分
+    push_top_n: Optional[int] = None  # 每次上新最多推送新房数; None=用 push_threshold 阈值模式
 
 def _section(cls, d):
     return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
@@ -111,4 +112,5 @@ def load_config(path: str) -> Config:
         discord=_section(Discord, discord_data),
         http=_section(Http, d["http"]),
         push_threshold=d.get("push_threshold"),
+        push_top_n=d.get("push_top_n"),
     )

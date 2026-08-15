@@ -132,3 +132,42 @@ def test_load_snapshot_non_dict_returns_none(tmp_path):
     with open(p, "w", encoding="utf-8") as f:
         f.write("[]")
     assert am.load_snapshot(p) is None
+
+
+# ---- top-X 推送: 过硬条件后按分数取前 N ----
+
+def _mk_rooms(specs):
+    """specs: [(room_id, rent_str), ...] → (room list, detail dict)"""
+    rooms = [{"id": rid, "rent": rent, "type": "2DK", "floorspace": "45㎡", "floor": "2階",
+              "urlDetail": f"/chintai/kanto/tokyo/20_2600_room.html?JKSS={rid}"}
+             for rid, rent in specs]
+    details = {("20_2600", rid): {"year": "15", "floor": "2階 /5階", "facility": "エレベーター、リフォーム"}
+               for rid, _ in specs}
+    return rooms, details
+
+
+def test_run_pushes_top_n_by_score(tmp_path):
+    p = str(tmp_path / "rooms.json")
+    cfg = make_cfg(); cfg.push_top_n = 2
+    am.run(cfg, FakeApi({"01": DANCHI}, {"20_2600": ROOMS}, DETAIL), p,
+           notify_fn=lambda *a, **k: True)   # 基线: 1 间既有房
+    rooms, details = _mk_rooms([("A", "60,000円"), ("B", "70,000円"), ("C", "80,000円")])
+    called = []
+    stat = am.run(cfg, FakeApi({"01": DANCHI}, {"20_2600": ROOMS + rooms}, {**DETAIL, **details}), p,
+                  notify_fn=lambda url, room, score, reason: called.append(room.room_id) or True)
+    assert stat["new"] == 3 and stat["pushed"] == 2
+    assert called == ["A", "B"]   # 分数最高两名(租金最低分最高)
+
+
+def test_run_hard_pass_filters_candidates(tmp_path):
+    p = str(tmp_path / "rooms.json")
+    cfg = make_cfg(); cfg.push_top_n = 3
+    am.run(cfg, FakeApi({"01": DANCHI}, {"20_2600": ROOMS}, DETAIL), p,
+           notify_fn=lambda *a, **k: True)   # 基线: 1 间既有房
+    rooms, details = _mk_rooms([("A", "60,000円"), ("B", "70,000円"), ("X", "150,000円")])
+    called = []
+    stat = am.run(cfg, FakeApi({"01": DANCHI}, {"20_2600": ROOMS + rooms}, {**DETAIL, **details}), p,
+                  notify_fn=lambda url, room, score, reason: called.append(room.room_id) or True)
+    assert stat["new"] == 3 and stat["pushed"] == 2
+    assert "X" not in called   # 租金>10万 不过硬条件, 不参与 top-X
+

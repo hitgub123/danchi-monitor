@@ -104,6 +104,24 @@ def _build_room(rid, info, st):
                   commute_min=st["commute_min"], prefecture="tokyo", skcs=st["skcs"])
 
 
+def _enrich_new_rooms(api, cfg, danchi_static, new_items, failed):
+    """对每个新房间构建 Room + 拉详情富化。返回 {room_id: Room}；失败进 failed(下次运行重试)。"""
+    enriched = {}
+    for rid, info in new_items.items():
+        st = danchi_static.get(info["danchi_id"])
+        if not st:
+            failed.add(rid)
+            continue
+        try:
+            room = _build_room(rid, info, st)
+            detail = api.get_room_detail(info["danchi_id"], rid)
+            M.enrich_room_from_detail(room, detail, cfg.precise.renovated_keywords)
+            enriched[rid] = room
+        except Exception:
+            failed.add(rid)
+    return enriched
+
+
 def run(cfg, api, snapshot_path=SNAPSHOT_PATH, notify_fn=None):
     if notify_fn is None:
         notify_fn = notify.notify_new_room
@@ -117,25 +135,34 @@ def run(cfg, api, snapshot_path=SNAPSHOT_PATH, notify_fn=None):
     new_items = diff_new(rooms, snapshot.get("rooms", {}))
     pushed = 0
     failed = set()
-    for rid, info in new_items.items():
-        st = danchi_static.get(info["danchi_id"])
-        if not st:
-            failed.add(rid)
-            continue
-        try:
-            room = _build_room(rid, info, st)
-            detail = api.get_room_detail(info["danchi_id"], rid)
-            M.enrich_room_from_detail(room, detail, cfg.precise.renovated_keywords)
+    enriched = _enrich_new_rooms(api, cfg, danchi_static, new_items, failed)
+    top_n = getattr(cfg, "push_top_n", None)
+    if top_n is None:
+        # 阈值模式(默认): should_push 硬条件+阈值
+        for rid, room in enriched.items():
             ok, score, reason = S.should_push(room, cfg)
-        except Exception:
-            failed.add(rid)   # 失败不进快照 → 下次运行重试
-            continue
-        if not ok:
-            continue
-        if notify_fn(webhook, room, score, reason):
-            pushed += 1
-        else:
-            failed.add(rid)   # 通知失败 → 不进快照 → 下次运行重试(at-least-once)
+            if not ok:
+                continue
+            if notify_fn(webhook, room, score, reason):
+                pushed += 1
+            else:
+                failed.add(rid)   # 通知失败 → 不进快照 → 下次运行重试(at-least-once)
+    else:
+        # top-X 模式: 过硬条件 → 按分数从高到低取前 N
+        candidates = []
+        for rid, room in enriched.items():
+            if not S.hard_pass(room, cfg.precise):
+                continue   # 硬条件不达标: 记录进快照但不推送
+            score = S.score_room(room, cfg.weights)
+            reason = f"评分{score} 步行{room.walk_min}分 月租{room.rent:,}円 面积{room.area:.0f}㎡ {room.madori}"
+            if room.has_elevator:
+                reason += " 有电梯"
+            candidates.append((score, room, reason))
+        for score, room, reason in sorted(candidates, key=lambda c: -c[0])[:top_n]:
+            if notify_fn(webhook, room, score, reason):
+                pushed += 1
+            else:
+                failed.add(room.room_id)
     snapshot["danchi_static"] = danchi_static
     snapshot["rooms"] = {rid: info for rid, info in rooms.items() if rid not in failed}
     old = load_snapshot(snapshot_path)
