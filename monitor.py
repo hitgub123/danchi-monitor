@@ -91,10 +91,11 @@ def run_monitor(cfg, api, db, notify_fn=None, comment_fn=None):
                     stat["pushed"] += 1
                     db.mark_room_seen(room.room_id, d["id"])
                     db.upsert_history(room.room_id, d["id"], score, reason, room.url)
-                    comment = comment_fn(room) if webhook and getattr(getattr(cfg, "discord", None), "llm_comment", True) else ""
-                    if comment:
-                        import notify
-                        notify.notify_llm_comment(webhook, room, comment)
+                    # LLM 点评调用已停用（2026-08-15，用户决策：注释掉、保留代码，将来可恢复）
+                    # comment = comment_fn(room) if webhook and getattr(getattr(cfg, "discord", None), "llm_comment", True) else ""
+                    # if comment:
+                    #     import notify
+                    #     notify.notify_llm_comment(webhook, room, comment)
                 else:
                     log.warning("Discord 推送失败，房间保持未标记（下次轮询重试） %s", room.room_id)
             db.log_poll(d["id"], len(current_ids), current_ids)

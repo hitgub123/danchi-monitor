@@ -161,3 +161,18 @@ def test_cost_time_fetched_at_most_once_per_day():
     monitor._cost_time_cache["2827"] = (0.0, entry[1], entry[2])
     monitor.run_monitor(make_cfg(), api, db)
     assert api.xml_calls == 2
+
+# ---- LLM 点评调用已注释停用（保留代码, 不调用）----
+
+def test_llm_comment_call_disabled():
+    cfg = make_cfg()
+    class D: webhook_url = "https://discord.test/hook"; llm_comment = True
+    cfg.discord = D()
+    api = FakeApi({"01":DANCHI}, {"20_2600":ROOMS}, DETAIL)
+    db = DB(":memory:"); db.init()
+    def never_comment(room, **kw):
+        raise AssertionError("comment_fn 不应被调用（LLM 调用已停用）")
+    stat = monitor.run_monitor(cfg, api, db,
+                               notify_fn=lambda url, room, score, reason: True,
+                               comment_fn=never_comment)
+    assert stat["pushed"] == 1
