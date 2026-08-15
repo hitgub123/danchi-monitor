@@ -39,7 +39,7 @@ baseline:
   floor: 5
 
 push_threshold: 40
-push_top_n: 5             # 每次上新最多推送的新房数(过硬条件后按分数取前 N)
+push_top_n: 3             # 每次上新最多推送的新房数(过硬条件后按分数取前 N)
 
 schedule:
   day_interval_min: 10
