@@ -39,6 +39,16 @@ def save_snapshot(path, snapshot):
     os.replace(tmp, path)
 
 
+class FileStore:
+    """默认快照存储：写本地 JSON 文件（GitHub Actions / 本地调试路径）。"""
+    def __init__(self, path):
+        self.path = path
+    def load(self):
+        return load_snapshot(self.path)
+    def save(self, snapshot):
+        save_snapshot(self.path, snapshot)
+
+
 # ---- diff / 基线 ----
 
 def diff_new(current, previous):
@@ -122,11 +132,13 @@ def _enrich_new_rooms(api, cfg, danchi_static, new_items, failed):
     return enriched
 
 
-def run(cfg, api, snapshot_path=SNAPSHOT_PATH, notify_fn=None):
+def run(cfg, api, snapshot_path=SNAPSHOT_PATH, notify_fn=None, store=None):
     if notify_fn is None:
         notify_fn = notify.notify_new_room
+    if store is None:
+        store = FileStore(snapshot_path)
     webhook = getattr(getattr(cfg, "discord", None), "webhook_url", "")
-    snapshot = load_snapshot(snapshot_path) or {}
+    snapshot = store.load() or {}
     table = _load_table(api, cfg, snapshot)
     cond = build_cond(cfg.destination.station_cd, table,
                       cfg.destination.commute_max_min, cfg.destination.change_max)
@@ -165,8 +177,8 @@ def run(cfg, api, snapshot_path=SNAPSHOT_PATH, notify_fn=None):
                 failed.add(room.room_id)
     snapshot["danchi_static"] = danchi_static
     snapshot["rooms"] = {rid: info for rid, info in rooms.items() if rid not in failed}
-    old = load_snapshot(snapshot_path)
-    save_snapshot(snapshot_path, snapshot)
+    old = store.load()
+    store.save(snapshot)
     return {"total": len(rooms), "new": len(new_items), "pushed": pushed,
             "changed": old != snapshot}
 

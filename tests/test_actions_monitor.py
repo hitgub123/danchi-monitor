@@ -171,3 +171,34 @@ def test_run_hard_pass_filters_candidates(tmp_path):
     assert stat["new"] == 3 and stat["pushed"] == 2
     assert "X" not in called   # 租金>10万 不过硬条件, 不参与 top-X
 
+
+# ---- 快照存储抽象(FileStore / 可注入 store) ----
+
+class FakeStore:
+    def __init__(self, initial=None):
+        self.data = initial
+        self.loads = 0
+        self.saves = 0
+    def load(self):
+        self.loads += 1
+        return self.data
+    def save(self, snapshot):
+        self.saves += 1
+        self.data = snapshot
+
+def test_run_uses_injectable_store():
+    cfg = make_cfg()
+    store = FakeStore()
+    api = FakeApi({"01": DANCHI}, {"20_2600": ROOMS}, DETAIL)
+    stat = am.run(cfg, api, store=store, notify_fn=lambda *a, **k: True)
+    assert stat["total"] == 1 and stat["new"] == 0 and stat["pushed"] == 0
+    assert store.loads >= 2 and store.saves >= 1          # 开头 load + changed 判定 load, 末尾 save
+    assert "001080409" in store.data["rooms"]
+    assert "20_2600" in store.data["danchi_static"]
+
+def test_run_default_store_still_writes_file(tmp_path):
+    p = str(tmp_path / "rooms.json")
+    am.run(make_cfg(), FakeApi({"01": DANCHI}, {"20_2600": ROOMS}, DETAIL), str(p),
+           notify_fn=lambda *a, **k: True)
+    assert "001080409" in am.load_snapshot(p)["rooms"]
+
