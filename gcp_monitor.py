@@ -26,11 +26,11 @@ class FirestoreStore:
 
 
 def _webhook():
+    from google.auth import default
     from google.cloud import secretmanager
+    _, project = default()   # 从默认凭证(函数服务账号)解析项目
     client = secretmanager.SecretManagerServiceClient()
-    # 项目从默认凭证解析(client.project), 不依赖环境变量(函数环境无 GOOGLE_CLOUD_PROJECT)
-    project = client.project or "danchi-monitor"
-    name = f"projects/{project}/secrets/danchi-discord-webhook/versions/latest"
+    name = f"projects/{project or 'danchi-monitor'}/secrets/danchi-discord-webhook/versions/latest"
     return client.access_secret_version(name=name).payload.data.decode("utf-8")
 
 
