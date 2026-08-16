@@ -40,6 +40,6 @@ def monitor(request):
     cfg.discord.webhook_url = _webhook()   # 注入 Secret Manager 的 webhook
     api = UrApi(cfg.http.user_agent, cfg.http.timeout, cfg.http.retry_max, cfg.http.backoff_base_sec)
     stat = am.run(cfg, api, store=FirestoreStore())
-    print(f"total={stat['total']} new={stat['new']} pushed={stat['pushed']} changed={stat['changed']}",
-          flush=True)
+    print(f"total={stat['total']} new={stat['new']} pushed={stat['pushed']} changed={stat['changed']} "
+          f"added={stat['added']} removed={stat['removed']}", flush=True)
     return json.dumps(stat), 200

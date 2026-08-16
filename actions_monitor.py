@@ -139,12 +139,13 @@ def run(cfg, api, snapshot_path=SNAPSHOT_PATH, notify_fn=None, store=None):
         store = FileStore(snapshot_path)
     webhook = getattr(getattr(cfg, "discord", None), "webhook_url", "")
     snapshot = store.load() or {}
+    previous_rooms = snapshot.get("rooms", {})   # 本次运行前的快照房间(计算 removed 用)
     table = _load_table(api, cfg, snapshot)
     cond = build_cond(cfg.destination.station_cd, table,
                       cfg.destination.commute_max_min, cfg.destination.change_max)
     danchi_static = snapshot.get("danchi_static", {})
     rooms = current_rooms(api, cfg, cond, table, danchi_static)
-    new_items = diff_new(rooms, snapshot.get("rooms", {}))
+    new_items = diff_new(rooms, previous_rooms)
     pushed = 0
     failed = set()
     enriched = _enrich_new_rooms(api, cfg, danchi_static, new_items, failed)
@@ -179,8 +180,11 @@ def run(cfg, api, snapshot_path=SNAPSHOT_PATH, notify_fn=None, store=None):
     snapshot["rooms"] = {rid: info for rid, info in rooms.items() if rid not in failed}
     old = store.load()
     store.save(snapshot)
+    added = [{"id": rid, "url": info.get("url", "")} for rid, info in new_items.items()]
+    removed = [{"id": rid, "url": info.get("url", "")}
+               for rid, info in previous_rooms.items() if rid not in rooms]
     return {"total": len(rooms), "new": len(new_items), "pushed": pushed,
-            "changed": old != snapshot}
+            "changed": old != snapshot, "added": added, "removed": removed}
 
 
 # ---- 提交快照(仅 Actions; 本地无 GITHUB_TOKEN 跳过) ----

@@ -202,3 +202,24 @@ def test_run_default_store_still_writes_file(tmp_path):
            notify_fn=lambda *a, **k: True)
     assert "001080409" in am.load_snapshot(p)["rooms"]
 
+
+# ---- 每轮新增/删除房间(带 URL) ----
+
+def test_run_reports_added_and_removed_urls(tmp_path):
+    p = str(tmp_path / "rooms.json")
+    am.run(make_cfg(), FakeApi({"01": DANCHI}, {"20_2600": ROOMS}, DETAIL), p,
+           notify_fn=lambda *a, **k: True)   # 基线: 001080409
+    roomB = {"id": "0020304", "rent": "70,000円", "type": "2DK", "floorspace": "45㎡",
+             "floor": "2階", "urlDetail": "/chintai/kanto/tokyo/20_2600_room.html?JKSS=0020304"}
+    detailB = {("20_2600", "0020304"): {"year": "15", "floor": "2階 /5階",
+                                        "facility": "エレベーター、リフォーム"}}
+    # 第二次: 001080409 消失, 0020304 新增
+    stat = am.run(make_cfg(), FakeApi({"01": DANCHI}, {"20_2600": [roomB]}, detailB), p,
+                  notify_fn=lambda *a, **k: True)
+    assert stat["new"] == 1
+    assert [a["id"] for a in stat["added"]] == ["0020304"]
+    assert [r["id"] for r in stat["removed"]] == ["001080409"]
+    assert stat["added"][0]["url"].endswith("JKSS=0020304")
+    assert stat["removed"][0]["url"].endswith("JKSS=001080409")
+
+

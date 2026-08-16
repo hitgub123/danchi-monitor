@@ -36,7 +36,8 @@ def test_monitor_handler_runs(monkeypatch):
     def fake_run(cfg, api, store=None, notify_fn=None):
         captured["cfg"] = cfg
         captured["store"] = store
-        return {"total": 1, "new": 0, "pushed": 0, "changed": True}
+        return {"total": 1, "new": 0, "pushed": 0, "changed": True,
+                "added": [], "removed": []}
     monkeypatch.setattr(gcp_monitor, "FirestoreStore", FakeStore)
     monkeypatch.setattr(gcp_monitor, "_webhook", lambda: "https://discord.test/hook")
     monkeypatch.setattr(gcp_monitor.am, "run", fake_run)
