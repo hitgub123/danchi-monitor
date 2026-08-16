@@ -3613,26 +3613,6 @@
       "area": 50.0,
       "floor": 5
     },
-    "000020313": {
-      "danchi_id": "20_1650",
-      "name": "2号棟313号室",
-      "url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_1650_room.html?JKSS=000020313",
-      "rent": 79200,
-      "commonfee": 3500,
-      "madori": "1LDK",
-      "area": 46.0,
-      "floor": 3
-    },
-    "000021213": {
-      "danchi_id": "20_1650",
-      "name": "2号棟1213号室",
-      "url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_1650_room.html?JKSS=000021213",
-      "rent": 95800,
-      "commonfee": 3500,
-      "madori": "2DK",
-      "area": 46.0,
-      "floor": 12
-    },
     "000130603": {
       "danchi_id": "20_4481",
       "name": "13号棟603号室",
@@ -3661,16 +3641,6 @@
       "commonfee": 9900,
       "madori": "1DK",
       "area": 38.0,
-      "floor": 4
-    },
-    "000100417": {
-      "danchi_id": "20_2320",
-      "name": "10号棟417号室",
-      "url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_2320_room.html?JKSS=000100417",
-      "rent": 86800,
-      "commonfee": 3300,
-      "madori": "2DK",
-      "area": 49.0,
       "floor": 4
     },
     "233050203": {
@@ -3893,16 +3863,6 @@
       "area": 59.0,
       "floor": 14
     },
-    "000091107": {
-      "danchi_id": "20_3380",
-      "name": "9号棟1107号室",
-      "url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_3380_room.html?JKSS=000091107",
-      "rent": 89500,
-      "commonfee": 5700,
-      "madori": "3DK",
-      "area": 59.0,
-      "floor": 11
-    },
     "000012508": {
       "danchi_id": "20_1320",
       "name": "12号棟508号室",
@@ -4103,16 +4063,6 @@
       "area": 50.0,
       "floor": 4
     },
-    "000010501": {
-      "danchi_id": "20_1770",
-      "name": "501号室",
-      "url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_1770_room.html?JKSS=000010501",
-      "rent": 86900,
-      "commonfee": 4700,
-      "madori": "2DK",
-      "area": 46.0,
-      "floor": 5
-    },
     "000330403": {
       "danchi_id": "20_1970",
       "name": "33号棟403号室",
@@ -4282,6 +4232,16 @@
       "madori": "1DK",
       "area": 44.0,
       "floor": 1
+    },
+    "000040207": {
+      "danchi_id": "20_6880",
+      "name": "4号棟207号室",
+      "url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_6880_room.html?JKSS=000040207",
+      "rent": 103800,
+      "commonfee": 6100,
+      "madori": "2DK",
+      "area": 50.0,
+      "floor": 2
     },
     "000050706": {
       "danchi_id": "20_6880",
