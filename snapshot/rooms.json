@@ -4233,16 +4233,6 @@
       "area": 45.0,
       "floor": 5
     },
-    "000120709": {
-      "danchi_id": "20_2520",
-      "name": "12号棟709号室",
-      "url": "https://www.ur-net.go.jp/chintai/kanto/tokyo/20_2520_room.html?JKSS=000120709",
-      "rent": 60000,
-      "commonfee": 3000,
-      "madori": "2DK",
-      "area": 46.0,
-      "floor": 7
-    },
     "000525403": {
       "danchi_id": "20_1580",
       "name": "5-2-5号棟403号室",
