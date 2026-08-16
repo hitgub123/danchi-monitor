@@ -66,6 +66,7 @@ gcloud billing budgets create --billing-account="$BA" --display-name=monitor --b
 6. **scheduler job 必须带 `--location`**（asia-northeast1）；cron 支持 `--time-zone=Asia/Tokyo`（GitHub Actions 做不到，这是迁移的核心优势）。
 7. **快照存 Firestore 而不是 GCS**：GCS 免费档限美国三区，Firestore 免费档（1GiB + 5万读/2万写每天）不限区域——东京可用还免费。
 8. **函数要 `--no-allow-unauthenticated`**（不公开），Scheduler 用 `--oidc-service-account-email` + `--oidc-token-audience` 认证；不能图省事开匿名。
+9. **项目迁移到组织后**（console 的 Migrate）：会丢 Cloud Functions 服务代理角色 → 部署报 `gcf-admin-robot ... storage.buckets.get denied`（上传桶），且 gcloud `functions describe` 报 `run.services.get denied`（console 仍正常）。**修复**：`gcloud projects add-iam-policy-binding <project> --member="serviceAccount:service-<项目号>@gcf-admin-robot.iam.gserviceaccount.com" --role=roles/cloudfunctions.serviceAgent`，然后重新部署。这是迁移搅乱服务代理体系所致，不是你的 IAM 问题。
 
 ## 成本护栏
 
