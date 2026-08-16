@@ -1,0 +1,4 @@
+requests
+pyyaml
+google-cloud-firestore
+google-cloud-secret-manager
