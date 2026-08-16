@@ -1,7 +1,6 @@
 # gcp_monitor.py — Cloud Functions 2nd gen 入口(HTTP trigger, Python 3.12)
 # 复用 actions_monitor 的采集/打分/通知逻辑; 快照存 Firestore, webhook 走 Secret Manager。
 import json
-import os
 
 import actions_monitor as am
 from config import load_config
@@ -29,9 +28,10 @@ class FirestoreStore:
 def _webhook():
     from google.cloud import secretmanager
     client = secretmanager.SecretManagerServiceClient()
-    name = (f"projects/{os.environ['GOOGLE_CLOUD_PROJECT']}"
-            "/secrets/danchi-discord-webhook/versions/latest")
-    return client.access_secret_version(request={"name": name}).payload.data.decode("utf-8")
+    # 项目从默认凭证解析(client.project), 不依赖环境变量(函数环境无 GOOGLE_CLOUD_PROJECT)
+    project = client.project or "danchi-monitor"
+    name = f"projects/{project}/secrets/danchi-discord-webhook/versions/latest"
+    return client.access_secret_version(name=name).payload.data.decode("utf-8")
 
 
 def monitor(request):
