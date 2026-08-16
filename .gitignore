@@ -6,3 +6,4 @@ __pycache__/
 .venv/
 # 含 Discord webhook，不提交；本地保留供运行
 config.yaml
+.build/
