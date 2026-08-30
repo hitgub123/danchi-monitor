@@ -192,6 +192,7 @@ def test_run_uses_injectable_store():
     api = FakeApi({"01": DANCHI}, {"20_2600": ROOMS}, DETAIL)
     stat = am.run(cfg, api, store=store, notify_fn=lambda *a, **k: True)
     assert stat["total"] == 1 and stat["new"] == 0 and stat["pushed"] == 0
+    assert stat["changed"] is True
     assert store.loads >= 2 and store.saves >= 1          # 开头 load + changed 判定 load, 末尾 save
     assert "001080409" in store.data["rooms"]
     assert "20_2600" in store.data["danchi_static"]
@@ -221,5 +222,4 @@ def test_run_reports_added_and_removed_urls(tmp_path):
     assert [r["id"] for r in stat["removed"]] == ["001080409"]
     assert stat["added"][0]["url"].endswith("JKSS=0020304")
     assert stat["removed"][0]["url"].endswith("JKSS=001080409")
-
 

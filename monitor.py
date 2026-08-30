@@ -27,7 +27,11 @@ def run_monitor(cfg, api, db, notify_fn=None, comment_fn=None):
     import score as S
     if notify_fn is None:
         import notify
-        notify_fn = notify.notify_new_room
+        mention = getattr(getattr(cfg, "discord", None), "mention", "@everyone")
+        default_notify = notify.notify_new_room
+        notify_fn = lambda url, room, score, reason: default_notify(
+            url, room, score, reason, mention=mention
+        )
     if comment_fn is None:
         import llm_comment
         comment_fn = llm_comment.llm_comment

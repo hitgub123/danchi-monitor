@@ -83,3 +83,9 @@ def test_enrich_elevator_from_room_detail():
     r3 = _room(total_floors=5, has_elevator=False, floor=3)
     enrich_room_from_detail(r3, {"year":"5", "floor":"3階 /5階", "facility":"エレベーター、エアコン"}, ["リフォーム"])
     assert r3.has_elevator is True
+
+def test_enrich_missing_year_defaults_to_zero():
+    from models import enrich_room_from_detail
+    room = _room(total_floors=5, has_elevator=False)
+    enrich_room_from_detail(room, {"floor":"2階 /5階", "facility":""}, None)
+    assert room.year == 0

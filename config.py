@@ -60,7 +60,8 @@ class Schedule:
 @dataclass
 class Discord:
     webhook_url: str
-    llm_comment: bool = True  # 是否发 LLM 点评(第二波)
+    llm_comment: bool = True
+    mention: str = "@everyone"
 
 @dataclass
 class Http:
@@ -81,8 +82,8 @@ class Config:
     schedule: Schedule
     discord: Discord
     http: Http
-    push_threshold: Optional[float] = None  # 推送阈值; None=用 baseline 算出的金町基准分
-    push_top_n: Optional[int] = None  # 每次上新最多推送新房数; None=用 push_threshold 阈值模式
+    push_threshold: Optional[float] = None
+    push_top_n: Optional[int] = None
 
 def _section(cls, d):
     return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
@@ -90,12 +91,13 @@ def _section(cls, d):
 def load_config(path: str) -> Config:
     with open(path, encoding="utf-8") as f:
         d = yaml.safe_load(f)
-    # webhook 优先取环境变量（云端部署不必把 key 写进 config.yaml）；
-    # 未设置时回退到 config.yaml 的值（本地沿用原有行为）。
     discord_data = dict(d.get("discord") or {})
     webhook_env = os.getenv("DANCHI_DISCORD_WEBHOOK", "").strip()
     if webhook_env:
         discord_data["webhook_url"] = webhook_env
+    mention_env = os.getenv("DANCHI_DISCORD_MENTION", "").strip()
+    if mention_env:
+        discord_data["mention"] = mention_env
     schedule_data = dict(d.get("schedule") or {})
     dw = schedule_data.get("dense_windows")
     if dw:

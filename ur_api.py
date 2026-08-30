@@ -22,6 +22,33 @@ class UrApi:
         self.retry_max = retry_max
         self.backoff_base_sec = backoff_base_sec
 
+    def _request(self, req: urllib.request.Request) -> bytes:
+        """发送请求并统一处理可重试错误。
+
+        GET 和 POST 使用相同的退避策略，避免两条实现逐渐产生行为差异。
+        ``retry_max`` 表示最多尝试次数，而不是重试次数。
+        """
+        for attempt in range(self.retry_max):
+            try:
+                with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                    return r.read()
+            except HTTPError as e:
+                if e.code in (403, 429):
+                    if attempt == self.retry_max - 1:
+                        raise RateLimitedError("rate limited") from e
+                    self._sleep_before_retry(attempt)
+                else:
+                    raise
+            except Exception:
+                if attempt == self.retry_max - 1:
+                    raise
+                self._sleep_before_retry(attempt)
+        raise RuntimeError("request loop exhausted unexpectedly")
+
+    def _sleep_before_retry(self, attempt: int) -> None:
+        delay = self.backoff_base_sec * (2 ** attempt)
+        time.sleep(delay + random.uniform(0.05, 0.15))
+
     def _post(self, path: str, params: dict) -> bytes:
         data = urllib.parse.urlencode(params).encode()
         req = urllib.request.Request(
@@ -34,41 +61,11 @@ class UrApi:
                 "X-Requested-With": "XMLHttpRequest",
             },
         )
-        for attempt in range(self.retry_max):
-            try:
-                with urllib.request.urlopen(req, timeout=self.timeout) as r:
-                    return r.read()
-            except HTTPError as e:
-                if e.code in (403, 429):
-                    if attempt == self.retry_max - 1:
-                        raise RateLimitedError("rate limited") from e
-                    time.sleep(self.backoff_base_sec * (2 ** attempt))
-                else:
-                    raise
-            except Exception:
-                if attempt == self.retry_max - 1:
-                    raise
-                time.sleep(self.backoff_base_sec * (2 ** attempt))
-            time.sleep(random.uniform(0.05, 0.15))  # 抖动
+        return self._request(req)
 
     def _get(self, url: str) -> bytes:
         req = urllib.request.Request(url, headers={"User-Agent": self.user_agent})
-        for attempt in range(self.retry_max):
-            try:
-                with urllib.request.urlopen(req, timeout=self.timeout) as r:
-                    return r.read()
-            except HTTPError as e:
-                if e.code in (403, 429):
-                    if attempt == self.retry_max - 1:
-                        raise RateLimitedError("rate limited") from e
-                    time.sleep(self.backoff_base_sec * (2 ** attempt))
-                else:
-                    raise
-            except Exception:
-                if attempt == self.retry_max - 1:
-                    raise
-                time.sleep(self.backoff_base_sec * (2 ** attempt))
-            time.sleep(random.uniform(0.05, 0.15))  # 抖动
+        return self._request(req)
 
     def suggest_station(self, name: str, block: str = "kanto") -> list:
         import json

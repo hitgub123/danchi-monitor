@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+from copy import deepcopy
 
 import costtime
 import models as M
@@ -13,6 +14,7 @@ from config import load_config
 from ur_api import UrApi
 
 SNAPSHOT_PATH = "snapshot/rooms.json"
+SNAPSHOT_KEYS = ("table", "danchi_static", "rooms")
 
 
 # ---- 快照读写 ----
@@ -25,10 +27,22 @@ def load_snapshot(path):
         return None
     if not isinstance(data, dict):
         return None
-    data.setdefault("table", {})
-    data.setdefault("danchi_static", {})
-    data.setdefault("rooms", {})
-    return data
+    return _normalize_snapshot(data)
+
+
+def _normalize_snapshot(data):
+    """Return a safe snapshot shape for both file and remote stores."""
+    if not isinstance(data, dict):
+        return None
+    normalized = dict(data)
+    for key in SNAPSHOT_KEYS:
+        if not isinstance(normalized.get(key), dict):
+            normalized[key] = {}
+    return normalized
+
+
+def _empty_snapshot():
+    return {key: {} for key in SNAPSHOT_KEYS}
 
 
 def save_snapshot(path, snapshot):
@@ -43,8 +57,10 @@ class FileStore:
     """默认快照存储：写本地 JSON 文件（GitHub Actions / 本地调试路径）。"""
     def __init__(self, path):
         self.path = path
+
     def load(self):
         return load_snapshot(self.path)
+
     def save(self, snapshot):
         save_snapshot(self.path, snapshot)
 
@@ -132,53 +148,66 @@ def _enrich_new_rooms(api, cfg, danchi_static, new_items, failed):
     return enriched
 
 
-def run(cfg, api, snapshot_path=SNAPSHOT_PATH, notify_fn=None, store=None):
-    if notify_fn is None:
-        notify_fn = notify.notify_new_room
-    if store is None:
-        store = FileStore(snapshot_path)
-    webhook = getattr(getattr(cfg, "discord", None), "webhook_url", "")
-    snapshot = store.load() or {}
-    previous_rooms = snapshot.get("rooms", {})   # 本次运行前的快照房间(计算 removed 用)
-    table = _load_table(api, cfg, snapshot)
-    cond = build_cond(cfg.destination.station_cd, table,
-                      cfg.destination.commute_max_min, cfg.destination.change_max)
-    danchi_static = snapshot.get("danchi_static", {})
-    rooms = current_rooms(api, cfg, cond, table, danchi_static)
-    new_items = diff_new(rooms, previous_rooms)
-    pushed = 0
+def _push_candidates(cfg, webhook, enriched, notify_fn):
+    """推送新房源，返回 (推送数, 通知失败的 room_id 集合)。"""
     failed = set()
-    enriched = _enrich_new_rooms(api, cfg, danchi_static, new_items, failed)
     top_n = getattr(cfg, "push_top_n", None)
-    if top_n is None:
-        # 阈值模式(默认): should_push 硬条件+阈值
-        for rid, room in enriched.items():
+    candidates = []
+    commute_max = getattr(getattr(cfg, "destination", None), "commute_max_min", 60)
+
+    for rid, room in enriched.items():
+        if not S.hard_pass(room, cfg.precise, commute_max):
+            continue
+        score = S.score_room(room, cfg.weights, commute_max)
+        if top_n is None:
             ok, score, reason = S.should_push(room, cfg)
             if not ok:
                 continue
-            if notify_fn(webhook, room, score, reason):
-                pushed += 1
-            else:
-                failed.add(rid)   # 通知失败 → 不进快照 → 下次运行重试(at-least-once)
-    else:
-        # top-X 模式: 过硬条件 → 按分数从高到低取前 N
-        candidates = []
-        for rid, room in enriched.items():
-            if not S.hard_pass(room, cfg.precise):
-                continue   # 硬条件不达标: 记录进快照但不推送
-            score = S.score_room(room, cfg.weights)
+        else:
             reason = f"评分{score} 步行{room.walk_min}分 月租{room.rent:,}円 面积{room.area:.0f}㎡ {room.madori}"
             if room.has_elevator:
                 reason += " 有电梯"
-            candidates.append((score, room, reason))
-        for score, room, reason in sorted(candidates, key=lambda c: -c[0])[:top_n]:
-            if notify_fn(webhook, room, score, reason):
-                pushed += 1
-            else:
-                failed.add(room.room_id)
+        candidates.append((score, rid, room, reason))
+
+    if top_n is not None:
+        candidates = sorted(candidates, key=lambda item: (-item[0], item[1]))[:top_n]
+
+    pushed = 0
+    for score, rid, room, reason in candidates:
+        if notify_fn(webhook, room, score, reason):
+            pushed += 1
+        else:
+            failed.add(rid)
+    return pushed, failed
+
+
+def run(cfg, api, snapshot_path=SNAPSHOT_PATH, notify_fn=None, store=None):
+    if notify_fn is None:
+        mention = getattr(getattr(cfg, "discord", None), "mention", "@everyone")
+        notify_fn = lambda webhook, room, score, reason: notify.notify_new_room(
+            webhook, room, score, reason, mention=mention
+        )
+    if store is None:
+        store = FileStore(snapshot_path)
+    webhook = getattr(getattr(cfg, "discord", None), "webhook_url", "")
+    previous = _normalize_snapshot(store.load()) or _empty_snapshot()
+    # 某些 Store（例如内存/Firebase fake）会返回内部可变对象；复制后再修改，
+    # 才能可靠地比较本轮是否真的发生了变化。
+    snapshot = deepcopy(previous)
+    previous_rooms = previous["rooms"]   # 本次运行前的快照房间(计算 removed 用)
+    table = _load_table(api, cfg, snapshot)
+    cond = build_cond(cfg.destination.station_cd, table,
+                      cfg.destination.commute_max_min, cfg.destination.change_max)
+    danchi_static = snapshot["danchi_static"]
+    rooms = current_rooms(api, cfg, cond, table, danchi_static)
+    new_items = diff_new(rooms, previous_rooms)
+    failed = set()
+    enriched = _enrich_new_rooms(api, cfg, danchi_static, new_items, failed)
+    pushed, notify_failed = _push_candidates(cfg, webhook, enriched, notify_fn)
+    failed.update(notify_failed)  # 通知失败 → 不进快照，下次运行重试
     snapshot["danchi_static"] = danchi_static
     snapshot["rooms"] = {rid: info for rid, info in rooms.items() if rid not in failed}
-    old = store.load()
+    old = _normalize_snapshot(store.load()) or {}
     store.save(snapshot)
     added = [{"id": rid, "url": info.get("url", "")} for rid, info in new_items.items()]
     removed = [{"id": rid, "url": info.get("url", "")}

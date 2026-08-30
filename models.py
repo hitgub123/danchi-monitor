@@ -8,7 +8,6 @@ def parse_rent(s: str) -> int:
     return int(m.group(1).replace(",", "")) if m else 0
 
 def parse_area(s: str) -> float:
-    # UR API 面积单位可能是 ㎡ 或 HTML 实体 &#13217;（U+33A1）
     m = re.search(r"([\d.]+)\s*(?:㎡|&#\d+;)", s or "")
     return float(m.group(1)) if m else 0.0
 
@@ -21,18 +20,13 @@ def parse_floor(s: str) -> Tuple[int, int]:
     return (nums[0], 0) if nums else (0, 0)
 
 def parse_access(access_html: str) -> List[dict]:
-    """解析 access HTML。按站点切段，区分纯徒步与巴士路段：
-    - 纯徒步(徒歩N, 无バス) → walk=N, has_bus=False
-    - 巴士路段(バスM分徒歩K分) → walk=99, has_bus=True（巴士=站远，距离算差）
-    结果按 (has_bus, walk) 排序，纯徒步最近者在前 → 取 [0] 即最佳距离。
-    """
     entries = []
     for li in re.findall(r"<li>(.*?)</li>", access_html or ""):
-        parts = re.split(r"[「｢]([^」｣]+)[」｣]駅", li)  # [前文, 站名1, 站1后文, 站名2, ...]
+        parts = re.split(r"[「｢]([^」｣]+)[」｣]駅", li)
         for i in range(1, len(parts), 2):
             station = parts[i].strip()
             after = parts[i + 1] if i + 1 < len(parts) else ""
-            if re.search(r"バス\d+(?:～\d+)?分", after):  # 覆盖 バス7分 / バス29～32分
+            if re.search(r"バス\d+(?:～\d+)?分", after):
                 entries.append({"station_name": station, "walk": 99, "has_bus": True})
             else:
                 walk_m = [int(x) for x in re.findall(r"徒歩(\d+)", after)]
@@ -74,6 +68,8 @@ class Room:
     skcs: str
     year: int = 0
     facility: str = ""
+    online_apply: bool = False
+    kari_link: str = ""
 
 def parse_danchi(d: dict, prefecture: str) -> Danchi:
     access = parse_access(d.get("access") or "")
@@ -86,7 +82,6 @@ def parse_danchi(d: dict, prefecture: str) -> Danchi:
     )
 
 def _full_url(u: str) -> str:
-    """UR API 返回的 urlDetail 是相对路径, 补全为完整链接。"""
     return u if (not u or u.startswith("http")) else "https://www.ur-net.go.jp" + u
 
 def parse_room(r: dict, danchi: Danchi) -> Room:
@@ -102,13 +97,17 @@ def parse_room(r: dict, danchi: Danchi) -> Room:
     )
 
 def enrich_room_from_detail(room: Room, detail: dict, renovated_keywords: list) -> None:
-    room.year = int(re.search(r"\d+", detail.get("year") or "0").group())
+    year_match = re.search(r"\d+", detail.get("year") or "")
+    room.year = int(year_match.group()) if year_match else 0
     floor, total = parse_floor(detail.get("floor"))
     if total:
         room.total_floors = total
     facility = detail.get("facility") or ""
     room.facility = facility
-    # 电梯以房间级设施为准（团地级 facility 是空泛列表，常误报"エレベーター"）；
-    # 楼栋>5层的高层默认有电梯（低层≤5 视为无电梯）。
     room.has_elevator = ("エレベーター" in facility) or (room.total_floors > 5)
-    room.renovated = any(k in (facility + (detail.get("feature") or "")) for k in renovated_keywords)
+    text = facility + (detail.get("feature") or "")
+    room.renovated = any(k in text for k in (renovated_keywords or []))
+    room.kari_link = detail.get("kariLink") or ""
+    room.online_apply = bool(room.kari_link.strip())
+    if detail.get("roomNm"):
+        room.name = detail.get("roomNm")
