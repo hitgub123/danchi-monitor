@@ -2,6 +2,7 @@
 
 > UR賃貸の新着空室を自動監視し、スコアリングして Discord に通知するシステム。GitHub Actions で定期実行中。
 > A fully automated UR-housing vacancy monitor: scheduled polling, scoring, and Discord push notifications via GitHub Actions.
+> 🤖 **AI 辅助开发（AI-assisted development）**——架构设计与关键决策由作者完成。
 
 ## プロジェクト概要
 
